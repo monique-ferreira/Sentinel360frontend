@@ -6,7 +6,6 @@ import { Input } from "./ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { Badge } from "./ui/badge";
 
-// Forçamos o tipo para evitar o erro "Property 'env' does not exist"
 const API_URL = (import.meta as any).env.VITE_API_URL || "https://sentinel360.onrender.com";
 
 interface ReportItem {
