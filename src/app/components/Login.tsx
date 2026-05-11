@@ -69,7 +69,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: regEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "_").toLowerCase(),
+          username: regEmail.split("@")[0],
           email: regEmail,
           password: regPass,
           full_name: regEmail.split("@")[0],
@@ -88,7 +88,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
       }
       setSuccess("Conta criada com sucesso! Faca o login.");
       setView("login");
-      setLoginUser(regEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "_").toLowerCase());
+      setLoginUser(regEmail.split("@")[0]);
     } catch (err: any) {
       setError("Erro de conexao: " + err.message);
     } finally {
@@ -158,7 +158,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
             </div>
           )}
 
-          {/* —— LOGIN  └└ s}
+          {/* ââ LOGIN  ââ s}
           {view === "login" && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
@@ -180,7 +180,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
                     type={showPass ? "text" : "password"}
                     autoComplete="current-password"
                     className="w%sfull h-10 rounded-lg border border-input bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                    placeholder="••••••••"
+                    placeholder="â¢â¢â¢â¢â¢â¢â¢â¢"
                     value={loginPass}
                     onChange={e => setLoginPass(e.target.value)}
                     disabled={loading}
@@ -215,7 +215,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
             </form>
           )}
 
-          {/* _└ REGISTER  └└ s*/}
+          {/* _â REGISTER  ââ s*/}
           {view === "register" && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
@@ -244,7 +244,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
             </form>
           )}
 
-          {/* └└ FORGOT PASSWORD  └└*/}
+          {/* ââ FORGOT PASSWORD  ââ*/}
           {view === "forgot" && (
             <div>
               <div className="flex items-center gap-3 mb-6">
