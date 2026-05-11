@@ -1,170 +1,295 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { ShieldCheck, UserPlus, LogIn, Mail, Lock, User, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Shield, AlertCircle, Loader2 } from "lucide-react";
 
-// URL do teu Backend no Render
-const API_URL = "https://sentinel360.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+
+type View = "login" | "register" | "forgot";
 
 export function Login({ onLogin }: { onLogin: (token: string) => void }) {
-  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<View>("login");
 
-  // Estados para Login
+  // Login fields
   const [loginUser, setLoginUser] = useState("");
   const [loginPass, setLoginPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
 
-  // Estados para Registro
-  const [regName, setRegName] = useState("");
+  // Register fields
   const [regEmail, setRegEmail] = useState("");
   const [regPass, setRegPass] = useState("");
+  const [regOrg, setRegOrg] = useState("");
+  const [showRegPass, setShowRegPass] = useState(false);
 
-  // FUNÇÃO DE LOGIN (FETCH REAL)
-  const handleLogin = async () => {
-    if (!loginUser || !loginPass) return alert("Preencha os campos de login.");
-    
-    setLoading(true);
+  // Forgot password
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginUser.trim() || !loginPass.trim()) { setError("Preencha usuario e senha."); return; }
+    setLoading(true); setError(""); setSuccess("");
     try {
-      const response = await fetch(`${API_URL}/login`, {
+      const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: loginUser, password: loginPass }),
+        body: JSON.stringify({ username: loginUser.trim(), password: loginPass }),
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem("sentinel_token", data.access_token);
-        onLogin(data.access_token);
-      } else {
-        alert(data.detail || "Erro ao fazer login");
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401) setError("Usuario ou senha incorretos. Verifique suas credenciais.");
+        else if (res.status === 403) setError("Conta desativada. Entre em contato com o administrador.");
+        else if (res.status === 422) setError("Formato invalido. Tente novamente.");
+        else if (res.status === 0 || res.status >= 500) setError("Servidor indisponivel. Aguarde alguns segundos e tente novamente (o servidor pode estar iniciando).");
+        else setError(data?.detail ?? `Erro ${res.status}. Tente novamente.`);
+        return;
       }
-    } catch (error) {
-      alert("Erro de conexão com o servidor.");
+      localStorage.setItem("s360_token", data.access_token);
+      onLogin(data.access_token);
+    } catch (err: any) {
+      if (err.message?.includes("fetch")) {
+        setError("Nao foi possivel conectar ao servidor. Verifique sua conexao ou aguarde o servidor iniciar.");
+      } else {
+        setError("Erro inesperado: " + err.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // FUNÇÃO DE REGISTRO (FETCH REAL)
-  const handleRegister = async () => {
-    if (!regName || !regEmail || !regPass) return alert("Preencha todos os campos.");
-
-    setLoading(true);
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regEmail || !regPass || !regOrg) { setError("Preencha todos os campos."); return; }
+    if (regPass.length < 8) { setError("A senha deve ter pelo menos 8 caracteres."); return; }
+    setLoading(true); setError(""); setSuccess("");
     try {
-      const response = await fetch(`${API_URL}/register`, {
+      const res = await fetch(`${API_URL}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: regEmail.split('@')[0], // Gera um username do email
-          password: regPass,
+          username: regEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "_").toLowerCase(),
           email: regEmail,
-          fullname: regName
+          password: regPass,
+          full_name: regEmail.split("@")[0],
+          org_name: regOrg,
+          org_slug: regOrg.toLowerCase().replace(/[^a-z0-9]/g, "-"),
         }),
       });
-
-      if (response.ok) {
-        alert("Conta criada com sucesso! Agora faça login.");
-        // Opcional: mudar para aba login automaticamente aqui
-      } else {
-        const data = await response.json();
-        alert(data.detail || "Erro ao registrar");
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 409 || data?.detail?.includes("duplicate") || data?.detail?.includes("already")) {
+          setError("Email ja cadastrado. Tente fazer login.");
+        } else {
+          setError(data?.detail ?? "Erro ao criar conta.");
+        }
+        return;
       }
-    } catch (error) {
-      alert("Erro de conexão com o servidor.");
+      setSuccess("Conta criada com sucesso! Faca o login.");
+      setView("login");
+      setLoginUser(regEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "_").toLowerCase());
+    } catch (err: any) {
+      setError("Erro de conexao: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) { setError("Informe seu email."); return; }
+    setLoading(true); setError("");
+    try {
+      await fetch(`${API_URL}/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      setForgotSent(true);
+    } catch {
+      setForgotSent(true);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[#f8fafc]">
-      <Card className="w-[420px] border-slate-200 bg-white shadow-2xl">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-50 border border-green-100">
-            <ShieldCheck className="h-10 w-10 text-green-600" />
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md">
+        {/* Logo / Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-foreground mb-4">
+            <Shield className="w-8 h-8 text-background" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">Sentinel 360</CardTitle>
-          <CardDescription className="text-slate-500 font-medium">Cyber Defense & Governance</CardDescription>
-        </CardHeader>
-        
-        <CardContent>
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8 bg-slate-100 p-1 rounded-lg">
-              <TabsTrigger value="login" className="data-[state=active]:bg-white data-[state=active]:text-green-600">
-                Entrar
-              </TabsTrigger>
-              <TabsTrigger value="register" className="data-[state=active]:bg-white data-[state=active]:text-blue-600">
-                Registrar
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login" className="space-y-5">
-              <div className="space-y-4">
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input 
-                    placeholder="E-mail ou Utilizador" 
-                    className="pl-10" 
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                  />
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-                  <Input 
-                    type="password" 
-                    placeholder="Senha" 
-                    className="pl-10"
-                    value={loginPass}
-                    onChange={(e) => setLoginPass(e.target.value)}
-                  />
-                </div>
-              </div>
-              <Button 
-                onClick={handleLogin} 
-                disabled={loading}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold h-11"
-              >
-                {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <><LogIn className="mr-2 h-4 w-4" /> Acessar Dashboard</>}
-              </Button>
-            </TabsContent>
-
-            <TabsContent value="register" className="space-y-5">
-              <div className="space-y-4">
-                <Input 
-                  placeholder="Nome Completo" 
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                />
-                <Input 
-                  placeholder="E-mail Corporativo" 
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                />
-                <Input 
-                  type="password" 
-                  placeholder="Criar Senha Segura" 
-                  value={regPass}
-                  onChange={(e) => setRegPass(e.target.value)}
-                />
-              </div>
-              <Button 
-                onClick={handleRegister} 
-                disabled={loading}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-11"
-              >
-                {loading ? <Loader2 className="animate-spin h-4 w-4" /> : <><UserPlus className="mr-2 h-4 w-4" /> Finalizar Registo</>}
-              </Button>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-
-        <div className="p-4 text-center border-t border-slate-50 bg-slate-50/50 rounded-b-2xl text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-            Sentinel 360 v1.0.2 • Securing Your Data
+          <h1 className="text-2xl font-semibold tracking-tight">Sentinel360</h1>
+          <p className="text-sm text-muted-foreground mt-1">Cyber Defense Platform</p>
         </div>
-      </Card>
+
+        <div className="bg-card border rounded-xl p-6 shadow-sm">
+          {/* Tabs */}
+          {view !== "forgot" && (
+            <div className="flex border-b border-border mb-6">
+              <button
+                className={`flex-1 pb-3 text-sm font-medium border-b-2 transition-colors ${view === "login" ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                onClick={() => { setView("login"); setError(""); setSuccess(""); }}
+              >
+                Entrar
+              </button>
+              <button
+                className={`flex-1 pb-3 text-sm font-medium border-b-2 transition-colors ${view === "register" ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                onClick={() => { setView("register"); setError(""); setSuccess(""); }}
+              >
+                Criar conta
+              </button>
+            </div>
+          )}
+
+          {/* Error / Success */}
+          {error && (
+            <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-sm text-green-700 dark:text-green-400">
+              {success}
+            </div>
+          )}
+
+          {/* —— LOGIN  └└ s}
+          {view === "login" && (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Usuario</label>
+                <input
+                  type="text"
+                  autoComplete="username"
+                  className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  placeholder="seu_usuario"
+                  value={loginUser}
+                  onChange={e => setLoginUser(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Senha</label>
+                <div className="relative">
+                  <input
+                    type={showPass ? "text" : "password"}
+                    autoComplete="current-password"
+                    className="w%sfull h-10 rounded-lg border border-input bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                    placeholder="••••••••"
+                    value={loginPass}
+                    onChange={e => setLoginPass(e.target.value)}
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPass ? "Ocultar senha" : "Mostrar senha"}
+                  >
+                    {showPass ? <EyeOff className="h-size-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <div className="flex justify-end mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => { setView("forgot"); setError(""); setSuccess(""); setForgotSent(false); }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                  >
+                    Esqueceu sua senha?
+                  </button>
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w%sfull h-10 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Entrando...</> : "Entrar"}
+              </button>
+            </form>
+          )}
+
+          {/* _└ REGISTER  └└ s*/}
+          {view === "register" && (
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Email corporativo</label>
+                <input type="email" autoComplete="email" className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="voce@empresa.com" value={regEmail} onChange={e => setRegEmail(e.target.value)} disabled={loading}/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Nome da organizacao</label>
+                <input type="text" className="w%sfull h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="Minha Empresa" value={regOrg} onChange={e => setRegOrg(e.target.value)} disabled={loading}/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">Senha</label>
+                <div className="relative">
+                  <input type={showRegPass ? "text" : "password"} autoComplete="new-password" className="w-full h-10 rounded-lg border border-input bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="Minimo 8 caracteres" value={regPass} onChange={e => setRegPass(e.target.value)} disabled={loading}/>
+                  <button type="button" onClick={() => setShowRegPass(!showRegPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors" tabIndex={-1} aria-label={showRegPass ? "Ocultar senha" : "Mostrar senha"}>
+                    {showRegPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {regPass && regPass.length < 8 && (
+                  <p className="text-xs text-amber-600 mt-1">Minimo 8 caracteres</p>
+                )}
+              </div>
+              <button type="submit" disabled={loading} className="w%sfull h-10 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2">
+                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Criando conta...</> : "Criar conta"}
+              </button>
+            </form>
+          )}
+
+          {/* └└ FORGOT PASSWORD  └└*/}
+          {view === "forgot" && (
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                <button
+                  onClick={() => { setView("login"); setError(""); setForgotSent(false); }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  &#8592; Voltar
+                </button>
+                <h2 className="text-base font-medium">Recuperar senha</h2>
+              </div>
+              {forgotSent ? (
+                <div className="text-center space-y-3 py-4">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-950/30 mb-2">
+                    <Shield className="h-size-6 w-6 text-green-600" />
+                  </div>
+                  <p className="text-sm font-medium">Email enviado!</p>
+                  <p className="text-sm text-muted-foreground">Se o email existir no sistema, voce recehera instrucoes para redefinir sua senha em instantes.</p>
+                  <button
+                    onClick={() => { setView("login"); setForgotSent(false); }}
+                    className="mt-4 text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                  >
+                    Voltar ao login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgot} className="space-y-4">
+                  <p className="text-sm text-muted-foreground">Informe seu email e enviaremos instrucoes para redefinir sua senha.</p>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Email</label>
+                    <input type="email" autoComplete="email" className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20" placeholder="voce@empresa.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} disabled={loading}/>
+                  </div>
+                  <button type="submit" disabled={loading} className="w-full h-10 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+                    {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Enviando...</> : "Enviar instrucoes"}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          Sentinel360 &copy; {new Date().getFullYear()} &mdash; Cyber Defense Platform
+        </p>
+      </div>
     </div>
   );
 }
