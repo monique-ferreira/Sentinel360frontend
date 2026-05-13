@@ -12,7 +12,9 @@ export function InactiveFiles() {
       const res = await fetch(`${API_URL}/results`);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data = await res.json();
-      setItems((data.items ?? []).filter((i: any) => i.Inativo === "SIM" || i.is_inactive === true));
+      setItems((data.items ?? []).filter((i: any) =>
+        i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive === true
+      ));
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponivel." : e.message);
     } finally { setLoading(false); }
@@ -43,15 +45,15 @@ export function InactiveFiles() {
           <Table>
             <TableHeader><TableRow>
               <TableHead>Arquivo</TableHead><TableHead>Caminho</TableHead>
-              <TableHead>Data</TableHead><TableHead className="text-right">Tamanho</TableHead>
+              <TableHead>Data do scan</TableHead><TableHead className="text-right">Tamanho</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {items.map((item, i) => (
                 <TableRow key={i}>
-                  <TableCell className="font-medium max-w-[200px] truncate">{item.Arquivo || item.name}</TableCell>
-                  <TableCell className="text-muted-foreground text-xs max-w-[300px] truncate">{item.Caminho || item.path}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{item.Data || item.last_scan || item.last_accessed}</TableCell>
-                  <TableCell className="text-right text-xs">{item.Tamanho_MB || item.size_mb} MB</TableCell>
+                  <TableCell className="font-medium max-w-[200px] truncate">{item.nome || item.Arquivo || item.name}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs max-w-[300px] truncate">{item.caminho || item.Caminho || item.path}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">{item.last_scan || item.Data || item.last_accessed}</TableCell>
+                  <TableCell className="text-right text-xs">{item.tamanho_mb ?? item.Tamanho_MB ?? item.size_mb} MB</TableCell>
                 </TableRow>
               ))}
             </TableBody>
