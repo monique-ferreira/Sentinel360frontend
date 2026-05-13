@@ -6,6 +6,7 @@ const RISK_STYLE: Record<string,string> = {
   "Credencial":"bg-red-100 text-red-700 border-red-200",
   "Token/Key":"bg-amber-100 text-amber-700 border-amber-200",
   "CPF":"bg-red-100 text-red-700 border-red-200",
+  "Chave Privada":"bg-red-100 text-red-700 border-red-200",
   "Email":"bg-blue-100 text-blue-700 border-blue-200",
 };
 export function SensitiveData() {
@@ -18,7 +19,10 @@ export function SensitiveData() {
       const res = await fetch(`${API_URL}/results`);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data = await res.json();
-      setItems((data.items ?? []).filter((i: any) => i.Riscos && i.Riscos !== "Nenhum" && i.Riscos !== ""));
+      setItems((data.items ?? []).filter((i: any) => {
+        const r = i.riscos || i.Riscos || "";
+        return r && r !== "NENHUM" && r !== "Nenhum" && r !== "";
+      }));
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponivel." : e.message);
     } finally { setLoading(false); }
@@ -29,7 +33,7 @@ export function SensitiveData() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2"><ShieldAlert className="h-6 w-6"/>Dados Sensiveis</h1>
-          <p className="text-sm text-muted-foreground">Arquivos com credenciais, tokens e dados pessoais</p>
+          <p className="text-sm text-muted-foreground">Arquivos com credenciais, tokens e dados pessoais detectados</p>
         </div>
         <button onClick={load} disabled={loading} className="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md hover:bg-secondary disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}/>Atualizar
@@ -48,21 +52,21 @@ export function SensitiveData() {
         <div className="border rounded-lg overflow-hidden">
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Arquivo</TableHead><TableHead>Risco</TableHead>
+              <TableHead>Arquivo</TableHead><TableHead>Risco detectado</TableHead>
               <TableHead>Caminho</TableHead><TableHead>Data</TableHead>
               <TableHead className="text-right">Tam.</TableHead>
             </TableRow></TableHeader>
             <TableBody>
               {items.map((item, i) => {
-                const r = item.Riscos || item.risk_level || "?";
-                const cls = RISK_STYLE[r] || "bg-gray-100 text-gray-700 border-gray-200";
+                const r = item.riscos || item.Riscos || "?";
+                const cls = Object.entries(RISK_STYLE).find(([k]) => r.includes(k))?.[1] || "bg-gray-100 text-gray-700 border-gray-200";
                 return (
                   <TableRow key={i}>
-                    <TableCell className="font-medium max-w-[200px] truncate">{item.Arquivo || item.name}</TableCell>
+                    <TableCell className="font-medium max-w-[200px] truncate">{item.nome || item.Arquivo || item.name}</TableCell>
                     <TableCell><span className={`inline-flex px-2 py-0.5 rounded-full text-xs border ${cls}`}>{r}</span></TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate">{item.Caminho || item.path}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{item.Data || item.last_scan}</TableCell>
-                    <TableCell className="text-right text-xs">{item.Tamanho_MB || item.size_mb} MB</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[280px] truncate">{item.caminho || item.Caminho || item.path}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{item.last_scan || item.Data}</TableCell>
+                    <TableCell className="text-right text-xs">{item.tamanho_mb ?? item.Tamanho_MB ?? item.size_mb} MB</TableCell>
                   </TableRow>
                 );
               })}
