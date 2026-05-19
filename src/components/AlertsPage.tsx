@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, Bell, CheckCircle2, RefreshCw, ShieldAlert, Clock } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
 const RISK_STYLE: Record<string,string> = {
   critical:"border-l-red-500 bg-red-50/40",
   high: "border-l-amber-500 bg-amber-50/40",

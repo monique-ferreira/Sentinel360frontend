@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Play, RefreshCw, Plus, Copy, CheckCircle2, ShieldAlert, Cpu, Clock, Key } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
 
 function timeSince(iso: string | null): string {
   if (!iso) return "nunca";

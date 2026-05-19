@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff, FolderClock, Search, FolderOpen } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
 
 export function InactiveFiles() {
   const { token } = useAuth();

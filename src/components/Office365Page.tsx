@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Building2, Users, ShieldOff, RefreshCw, CheckCircle2, Lock } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
 
 function daysSince(iso: string | null): string {
   if (!iso) return "nunca";
