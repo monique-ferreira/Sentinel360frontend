@@ -2,12 +2,14 @@ import { useEffect, useState, useRef } from "react";
 import {
   Play, RefreshCw, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Shield, Users, Building2, Zap,
+  Cloud, BarChart3, Download,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 type ScanPhase = "idle" | "scanning" | "done" | "error";
 type SaveStatus = "idle" | "saving" | "ok" | "error";
+type CloudPhase = "idle" | "scanning" | "done" | "error";
 
 function Field({ label, value, onChange, type = "text", placeholder, disabled }: {
   label: string; value: string; onChange: (v: string) => void;
@@ -83,6 +85,16 @@ export function Integrations() {
   const [azureMsg, setAzureMsg] = useState("");
   const [azureUsers, setAzureUsers] = useState<any[]>([]);
   const [loadingAzure, setLoadingAzure] = useState(false);
+
+  // Cloud scan
+  const [cloudPhase, setCloudPhase] = useState<CloudPhase>("idle");
+  const [cloudProvider, setCloudProvider] = useState<"ms365" | "azure">("ms365");
+  const [cloudProgress, setCloudProgress] = useState(0);
+  const [cloudMsg, setCloudMsg] = useState("");
+  const [cloudFiles, setCloudFiles] = useState<any[]>([]);
+  const [loadingCloudFiles, setLoadingCloudFiles] = useState(false);
+  const cloudPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [biLoading, setBiLoading] = useState(false);
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -178,6 +190,62 @@ export function Integrations() {
     } catch { setAzureMsg("Servidor indisponível."); }
     finally { setLoadingAzure(false); }
   };
+
+  const stopCloudPoll = () => { if (cloudPollRef.current) { clearInterval(cloudPollRef.current); cloudPollRef.current = null; } };
+
+  const startCloudScan = async (provider: "ms365" | "azure") => {
+    setCloudProvider(provider); setCloudPhase("scanning"); setCloudProgress(0); setCloudMsg(""); setCloudFiles([]);
+    try {
+      const res = await fetch(`${API_URL}/integrations/${provider === "ms365" ? "office365" : "azure"}/scan-files?days=180`, {
+        method: "POST", headers: h,
+      });
+      if (!res.ok) { const d = await res.json(); setCloudPhase("error"); setCloudMsg(d.detail ?? `Erro ${res.status}`); return; }
+      stopCloudPoll();
+      cloudPollRef.current = setInterval(async () => {
+        try {
+          const s = await fetch(`${API_URL}/integrations/office365/scan-status`, { headers: h });
+          if (!s.ok) return;
+          const d = await s.json();
+          setCloudProgress(d.progress ?? 0);
+          if (d.error) { setCloudPhase("error"); setCloudMsg(d.error); stopCloudPoll(); return; }
+          if (!d.is_scanning) {
+            setCloudPhase("done");
+            setCloudMsg("Varredura cloud concluída!");
+            stopCloudPoll();
+            fetchCloudFiles(provider);
+          }
+        } catch { /* ignore */ }
+      }, 2000);
+    } catch { setCloudPhase("error"); setCloudMsg("Servidor indisponível."); }
+  };
+
+  const fetchCloudFiles = async (provider: "ms365" | "azure") => {
+    setLoadingCloudFiles(true);
+    try {
+      const endpoint = provider === "ms365" ? "office365" : "azure";
+      const res = await fetch(`${API_URL}/integrations/${endpoint}/file-results`, { headers: h });
+      if (!res.ok) return;
+      const d = await res.json();
+      setCloudFiles(d.items ?? []);
+    } catch { /* ignore */ }
+    finally { setLoadingCloudFiles(false); }
+  };
+
+  const openBiReport = async () => {
+    setBiLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/report/bi`, { headers: h });
+      if (!res.ok) { alert("Erro ao gerar relatório BI."); return; }
+      const html = await res.text();
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch { alert("Servidor indisponível."); }
+    finally { setBiLoading(false); }
+  };
+
+  useEffect(() => () => stopCloudPoll(), []);
 
   const btnCls = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50";
 
@@ -304,11 +372,20 @@ export function Integrations() {
               Salvar credenciais M365
             </button>
             {ms365Status === "ok" && (
-              <button onClick={auditMs365} disabled={loadingMs365}
-                className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
-                {loadingMs365 ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                Verificar usuários inativos
-              </button>
+              <>
+                <button onClick={auditMs365} disabled={loadingMs365}
+                  className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
+                  {loadingMs365 ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  Verificar usuários inativos
+                </button>
+                <button onClick={() => startCloudScan("ms365")} disabled={cloudPhase === "scanning"}
+                  className={`${btnCls} bg-[#58a6ff]/10 border border-[#58a6ff]/30 text-[#58a6ff] hover:bg-[#58a6ff]/20`}>
+                  {cloudPhase === "scanning" && cloudProvider === "ms365"
+                    ? <RefreshCw className="h-4 w-4 animate-spin" />
+                    : <Cloud className="h-4 w-4" />}
+                  Varrer arquivos SharePoint/OneDrive
+                </button>
+              </>
             )}
           </div>
           {ms365Users.length > 0 && <UserList users={ms365Users} label="Microsoft 365" />}
@@ -348,16 +425,158 @@ export function Integrations() {
               Salvar credenciais Azure AD
             </button>
             {azureStatus === "ok" && (
-              <button onClick={auditAzure} disabled={loadingAzure}
-                className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
-                {loadingAzure ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                Auditar contas inativas (90d)
-              </button>
+              <>
+                <button onClick={auditAzure} disabled={loadingAzure}
+                  className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
+                  {loadingAzure ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  Auditar contas inativas (90d)
+                </button>
+                <button onClick={() => startCloudScan("azure")} disabled={cloudPhase === "scanning"}
+                  className={`${btnCls} bg-[#bc8cff]/10 border border-[#bc8cff]/30 text-[#bc8cff] hover:bg-[#bc8cff]/20`}>
+                  {cloudPhase === "scanning" && cloudProvider === "azure"
+                    ? <RefreshCw className="h-4 w-4 animate-spin" />
+                    : <Cloud className="h-4 w-4" />}
+                  Varrer arquivos OneDrive
+                </button>
+              </>
             )}
           </div>
           {azureUsers.length > 0 && <UserList users={azureUsers} label="Azure AD" />}
         </div>
       </IntegrationCard>
+
+      {/* Cloud scan section */}
+      {(cloudPhase !== "idle") && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-[#58a6ff]/10 border border-[#58a6ff]/20 flex items-center justify-center">
+              <Cloud className="w-4 h-4 text-[#58a6ff]" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Varredura Cloud — {cloudProvider === "ms365" ? "SharePoint + OneDrive" : "OneDrive (Azure AD)"}
+              </p>
+              <p className="text-xs text-muted-foreground">Análise de arquivos sensíveis e inativos na nuvem</p>
+            </div>
+            {cloudPhase === "done" && (
+              <span className="ml-auto flex items-center gap-1.5 text-xs text-[#3fb950] font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5" />Concluído
+              </span>
+            )}
+          </div>
+          <div className="p-5 space-y-4">
+            {cloudPhase === "error" && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />{cloudMsg}
+              </div>
+            )}
+            {(cloudPhase === "scanning" || cloudPhase === "done") && (
+              <div className="p-4 rounded-lg border border-border bg-secondary/30 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className={`flex items-center gap-1.5 font-medium ${cloudPhase === "scanning" ? "text-[#58a6ff]" : "text-[#3fb950]"}`}>
+                    {cloudPhase === "scanning"
+                      ? <><RefreshCw className="h-3 w-3 animate-spin" />Varrendo arquivos cloud...</>
+                      : <><CheckCircle2 className="h-3 w-3" />{cloudMsg}</>}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">{cloudProgress.toFixed(0)}%</span>
+                </div>
+                <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-700 ${cloudPhase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
+                    style={{ width: `${Math.max(2, Math.min(cloudProgress, 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {cloudPhase === "done" && (
+              <>
+                {loadingCloudFiles && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <RefreshCw className="h-3 w-3 animate-spin" />Carregando resultados...
+                  </div>
+                )}
+                {cloudFiles.length > 0 && <CloudFileTable files={cloudFiles} />}
+                {!loadingCloudFiles && cloudFiles.length === 0 && (
+                  <p className="text-xs text-muted-foreground">Nenhum arquivo sensível ou inativo encontrado.</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* BI Report */}
+      <div className="rounded-xl border border-border bg-card p-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-[#d29922]/10 border border-[#d29922]/20 flex items-center justify-center">
+            <BarChart3 className="w-4 h-4 text-[#d29922]" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Relatório BI Consolidado</p>
+            <p className="text-xs text-muted-foreground">Gráficos interativos de risco, inatividade e histórico de scans</p>
+          </div>
+        </div>
+        <button onClick={openBiReport} disabled={biLoading}
+          className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20 shrink-0`}>
+          {biLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Gerar Relatório BI
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CloudFileTable({ files }: { files: any[] }) {
+  const risky = files.filter(f => f.riscos && f.riscos !== "NENHUM");
+  const shown = files.slice(0, 100);
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <div className="px-3 py-2 bg-secondary/40 flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">
+          {files.length} item(ns) encontrado(s) — {risky.length} com risco
+        </span>
+      </div>
+      <div className="overflow-x-auto max-h-72 overflow-y-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-secondary/30">
+              <th className="text-left px-3 py-2 text-muted-foreground font-medium">Nome</th>
+              <th className="text-left px-3 py-2 text-muted-foreground font-medium">Origem</th>
+              <th className="text-left px-3 py-2 text-muted-foreground font-medium">Riscos</th>
+              <th className="text-left px-3 py-2 text-muted-foreground font-medium">Inativo</th>
+              <th className="text-left px-3 py-2 text-muted-foreground font-medium">MB</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {shown.map((f, i) => (
+              <tr key={i} className="hover:bg-white/[0.02]">
+                <td className="px-3 py-2 text-foreground max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title={f.caminho}>
+                  {f.nome}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
+                  {f.origem || "—"}
+                </td>
+                <td className="px-3 py-2">
+                  {f.riscos && f.riscos !== "NENHUM"
+                    ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-destructive/10 text-destructive border border-destructive/20">{f.riscos}</span>
+                    : <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="px-3 py-2">
+                  {f.inativo === "SIM"
+                    ? <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#d29922]/10 text-[#d29922] border border-[#d29922]/20">SIM</span>
+                    : <span className="text-muted-foreground">NÃO</span>}
+                </td>
+                <td className="px-3 py-2 text-muted-foreground tabular-nums">{f.tamanho_mb}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {files.length > 100 && (
+          <p className="text-center text-xs text-muted-foreground py-2">
+            Mostrando 100 de {files.length} itens.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
