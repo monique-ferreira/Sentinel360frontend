@@ -1,13 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import {
-  Play, RefreshCw, CheckCircle2, AlertCircle,
+  RefreshCw, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Shield, Users, Building2, Zap,
   Cloud, BarChart3, Download,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
-type ScanPhase = "idle" | "scanning" | "done" | "error";
 type SaveStatus = "idle" | "saving" | "ok" | "error";
 type CloudPhase = "idle" | "scanning" | "done" | "error";
 
@@ -57,13 +56,7 @@ function IntegrationCard({
 export function Integrations() {
   const { token } = useAuth();
 
-  // Scan state
-  const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
-  const [progress, setProgress] = useState(0);
-  const [scanTotal, setScanTotal] = useState(0);
-  const [scanProcessed, setScanProcessed] = useState(0);
   const [days, setDays] = useState(180);
-  const [scanMsg, setScanMsg] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // MS365
@@ -99,45 +92,6 @@ export function Integrations() {
   const h = { Authorization: `Bearer ${token}` };
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
-
-  const startPolling = () => {
-    stopPolling();
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_URL}/scan-status`, { headers: h });
-        if (!res.ok) return;
-        const d = await res.json();
-        setProgress(d.progress ?? 0);
-        setScanTotal(d.total ?? 0);
-        setScanProcessed(d.processed ?? 0);
-        if (!d.is_scanning) {
-          setScanPhase("done");
-          setScanMsg("Varredura concluída! Veja os resultados em Relatórios.");
-          stopPolling();
-        }
-      } catch { /* ignore */ }
-    }, 1500);
-  };
-
-  useEffect(() => {
-    fetch(`${API_URL}/scan-status`, { headers: h })
-      .then(r => r.json())
-      .then(d => { if (d.is_scanning) { setScanPhase("scanning"); setProgress(d.progress ?? 0); startPolling(); } })
-      .catch(() => {});
-    return () => stopPolling();
-  }, []);
-
-  const handleStartScan = async () => {
-    setScanPhase("scanning"); setProgress(0); setScanMsg(""); setScanTotal(0); setScanProcessed(0);
-    try {
-      const res = await fetch(`${API_URL}/scan?days=${days}`, { method: "POST", headers: h });
-      if (!res.ok) { const d = await res.json(); setScanPhase("error"); setScanMsg(d.detail ?? "Erro ao iniciar scan."); return; }
-      startPolling();
-    } catch (e: any) {
-      setScanPhase("error");
-      setScanMsg(e.message?.includes("fetch") ? "Servidor indisponível. Aguarde 30s." : e.message);
-    }
-  };
 
   const saveMs365 = async () => {
     if (!ms365Tenant || !ms365Client || !ms365Secret) { setMs365Msg("Preencha todos os campos."); setMs365Status("error"); return; }
@@ -259,85 +213,6 @@ export function Integrations() {
         <p className="text-sm text-muted-foreground mt-0.5">
           Gerencie o motor de varredura e as integrações do Sentinel 360.
         </p>
-      </div>
-
-      {/* Scan engine */}
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">Motor de Varredura Local</p>
-            <p className="text-xs text-muted-foreground">Análise de arquivos inativos e documentos sensíveis (LGPD)</p>
-          </div>
-          {scanPhase === "done" && (
-            <span className="ml-auto flex items-center gap-1.5 text-xs text-[#3fb950] font-medium">
-              <CheckCircle2 className="h-3.5 w-3.5" />Concluído
-            </span>
-          )}
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="flex items-end gap-3 flex-wrap">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
-                Limiar de inatividade (dias)
-              </label>
-              <input
-                type="number" min={1} max={3650} value={days}
-                onChange={e => setDays(Number(e.target.value))}
-                disabled={scanPhase === "scanning"}
-                className="w-28 h-9 px-3 rounded-lg border border-border bg-secondary text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-50 transition-colors"
-              />
-            </div>
-            {scanPhase !== "scanning" ? (
-              <button onClick={handleStartScan}
-                className={`${btnCls} bg-primary text-primary-foreground hover:bg-primary/90`}>
-                <Play className="h-4 w-4" />
-                Iniciar Scan
-              </button>
-            ) : (
-              <button disabled className={`${btnCls} bg-secondary text-muted-foreground cursor-not-allowed`}>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                Varrendo...
-              </button>
-            )}
-          </div>
-
-          {scanPhase === "error" && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />{scanMsg}
-            </div>
-          )}
-
-          {(scanPhase === "scanning" || scanPhase === "done") && (
-            <div className="p-4 rounded-lg border border-border bg-secondary/30 space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className={`flex items-center gap-1.5 font-medium ${scanPhase === "scanning" ? "text-[#58a6ff]" : "text-[#3fb950]"}`}>
-                  {scanPhase === "scanning"
-                    ? <><RefreshCw className="h-3 w-3 animate-spin" />Escaneando arquivos...</>
-                    : <><CheckCircle2 className="h-3 w-3" />Varredura concluída</>}
-                </span>
-                <span className="text-muted-foreground tabular-nums">
-                  {scanProcessed.toLocaleString("pt-BR")} / {scanTotal > 0 ? scanTotal.toLocaleString("pt-BR") : "?"} &nbsp;•&nbsp; {progress.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <div
-                  className={`h-2 rounded-full transition-all duration-700 ${scanPhase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
-                  style={{ width: `${Math.max(2, Math.min(progress, 100))}%` }}
-                />
-              </div>
-              {scanPhase === "done" && <p className="text-xs text-[#3fb950]">{scanMsg}</p>}
-            </div>
-          )}
-
-          {scanPhase === "idle" && (
-            <div className="border border-dashed border-border rounded-lg p-4 text-center text-sm text-muted-foreground">
-              Motor em espera. Clique em <strong className="text-foreground">Iniciar Scan</strong> para começar.
-            </div>
-          )}
-        </div>
       </div>
 
       {/* MS365 */}
