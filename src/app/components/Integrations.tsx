@@ -1,30 +1,61 @@
 import { useEffect, useState, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { Button } from "@/app/components/ui/button";
-import { Input } from "@/app/components/ui/input";
 import {
-  Play,
-  RefreshCw,
-  CheckCircle2,
-  WifiOff,
-  Building2,
-  Users,
-  Shield,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
+  Play, RefreshCw, CheckCircle2, AlertCircle,
+  ChevronDown, ChevronUp, Shield, Users, Building2, Zap,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
-
 type ScanPhase = "idle" | "scanning" | "done" | "error";
 type SaveStatus = "idle" | "saving" | "ok" | "error";
+
+function Field({ label, value, onChange, type = "text", placeholder, disabled }: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; disabled?: boolean;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-muted-foreground mb-1.5">{label}</label>
+      <input
+        type={type} value={value} onChange={e => onChange(e.target.value)}
+        placeholder={placeholder} disabled={disabled}
+        className="w-full h-9 px-3 rounded-lg border border-border bg-secondary text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-50 transition-colors"
+      />
+    </div>
+  );
+}
+
+function IntegrationCard({
+  title, subtitle, icon, color, open, onToggle, children,
+}: {
+  title: string; subtitle: string; icon: React.ReactNode; color: string;
+  open: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <button onClick={onToggle}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors text-left">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: color + "18", border: `1px solid ${color}35` }}>
+            <div style={{ color }}>{icon}</div>
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            <p className="text-xs text-muted-foreground">{subtitle}</p>
+          </div>
+        </div>
+        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && <div className="px-5 pb-5 border-t border-border pt-4">{children}</div>}
+    </div>
+  );
+}
 
 export function Integrations() {
   const { token } = useAuth();
 
-  // Scan
+  // Scan state
   const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
   const [progress, setProgress] = useState(0);
   const [scanTotal, setScanTotal] = useState(0);
@@ -53,17 +84,15 @@ export function Integrations() {
   const [azureUsers, setAzureUsers] = useState<any[]>([]);
   const [loadingAzure, setLoadingAzure] = useState(false);
 
-  const stopPolling = () => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-  };
+  const h = { Authorization: `Bearer ${token}` };
+
+  const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
   const startPolling = () => {
     stopPolling();
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`${API_URL}/scan-status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`${API_URL}/scan-status`, { headers: h });
         if (!res.ok) return;
         const d = await res.json();
         setProgress(d.progress ?? 0);
@@ -71,25 +100,17 @@ export function Integrations() {
         setScanProcessed(d.processed ?? 0);
         if (!d.is_scanning) {
           setScanPhase("done");
-          setScanMsg("Varredura concluída! Vá em Relatórios para ver os resultados.");
+          setScanMsg("Varredura concluída! Veja os resultados em Relatórios.");
           stopPolling();
         }
-      } catch { /* ignore poll errors */ }
+      } catch { /* ignore */ }
     }, 1500);
   };
 
   useEffect(() => {
-    fetch(`${API_URL}/scan-status`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`${API_URL}/scan-status`, { headers: h })
       .then(r => r.json())
-      .then(d => {
-        if (d.is_scanning) {
-          setScanPhase("scanning");
-          setProgress(d.progress ?? 0);
-          startPolling();
-        }
-      })
+      .then(d => { if (d.is_scanning) { setScanPhase("scanning"); setProgress(d.progress ?? 0); startPolling(); } })
       .catch(() => {});
     return () => stopPolling();
   }, []);
@@ -97,391 +118,269 @@ export function Integrations() {
   const handleStartScan = async () => {
     setScanPhase("scanning"); setProgress(0); setScanMsg(""); setScanTotal(0); setScanProcessed(0);
     try {
-      const res = await fetch(`${API_URL}/scan?days=${days}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        setScanPhase("error");
-        setScanMsg(d.detail ?? "Erro ao iniciar scan.");
-        return;
-      }
+      const res = await fetch(`${API_URL}/scan?days=${days}`, { method: "POST", headers: h });
+      if (!res.ok) { const d = await res.json(); setScanPhase("error"); setScanMsg(d.detail ?? "Erro ao iniciar scan."); return; }
       startPolling();
     } catch (e: any) {
       setScanPhase("error");
-      setScanMsg(
-        e.message?.includes("fetch")
-          ? "Servidor indisponível. Aguarde 30s e tente novamente."
-          : e.message
-      );
+      setScanMsg(e.message?.includes("fetch") ? "Servidor indisponível. Aguarde 30s." : e.message);
     }
   };
 
-  const saveMs365Config = async () => {
-    if (!ms365Tenant || !ms365Client || !ms365Secret) {
-      setMs365Msg("Preencha todos os campos."); setMs365Status("error"); return;
-    }
+  const saveMs365 = async () => {
+    if (!ms365Tenant || !ms365Client || !ms365Secret) { setMs365Msg("Preencha todos os campos."); setMs365Status("error"); return; }
     setMs365Status("saving"); setMs365Msg("");
     try {
       const res = await fetch(`${API_URL}/integrations/office365/configure`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...h },
         body: JSON.stringify({ tenant_id: ms365Tenant, client_id: ms365Client, client_secret: ms365Secret }),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        setMs365Status("error"); setMs365Msg(d.detail ?? `Erro ${res.status}`); return;
-      }
+      if (!res.ok) { const d = await res.json(); setMs365Status("error"); setMs365Msg(d.detail ?? `Erro ${res.status}`); return; }
       setMs365Status("ok"); setMs365Msg("Credenciais salvas com sucesso!");
-    } catch (e: any) {
-      setMs365Status("error");
-      setMs365Msg(e.message?.includes("fetch") ? "Servidor indisponível." : e.message);
-    }
+    } catch { setMs365Status("error"); setMs365Msg("Servidor indisponível."); }
   };
 
-  const saveAzureConfig = async () => {
-    if (!azureTenant || !azureClient || !azureSecret) {
-      setAzureMsg("Preencha todos os campos."); setAzureStatus("error"); return;
-    }
+  const saveAzure = async () => {
+    if (!azureTenant || !azureClient || !azureSecret) { setAzureMsg("Preencha todos os campos."); setAzureStatus("error"); return; }
     setAzureStatus("saving"); setAzureMsg("");
     try {
       const res = await fetch(`${API_URL}/integrations/azure/configure`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json", ...h },
         body: JSON.stringify({ tenant_id: azureTenant, client_id: azureClient, client_secret: azureSecret }),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        setAzureStatus("error"); setAzureMsg(d.detail ?? `Erro ${res.status}`); return;
-      }
+      if (!res.ok) { const d = await res.json(); setAzureStatus("error"); setAzureMsg(d.detail ?? `Erro ${res.status}`); return; }
       setAzureStatus("ok"); setAzureMsg("Credenciais salvas com sucesso!");
-    } catch (e: any) {
-      setAzureStatus("error");
-      setAzureMsg(e.message?.includes("fetch") ? "Servidor indisponível." : e.message);
-    }
+    } catch { setAzureStatus("error"); setAzureMsg("Servidor indisponível."); }
   };
 
-  const auditMs365Users = async () => {
+  const auditMs365 = async () => {
     setLoadingMs365(true); setMs365Msg("");
     try {
-      const res = await fetch(`${API_URL}/integrations/office365/audit?inactive_days=90`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_URL}/integrations/office365/audit?inactive_days=90`, { headers: h });
       if (!res.ok) { const d = await res.json(); setMs365Msg(d.detail ?? `Erro ${res.status}`); return; }
       const data = await res.json();
       setMs365Users(data.inactive_users ?? []);
-      if ((data.inactive_users ?? []).length === 0) setMs365Msg("Nenhum usuário inativo encontrado.");
-    } catch (e: any) {
-      setMs365Msg(e.message?.includes("fetch") ? "Servidor indisponível." : e.message);
-    } finally { setLoadingMs365(false); }
+      if (!(data.inactive_users ?? []).length) setMs365Msg("Nenhum usuário inativo encontrado.");
+    } catch { setMs365Msg("Servidor indisponível."); }
+    finally { setLoadingMs365(false); }
   };
 
-  const auditAzureUsers = async () => {
+  const auditAzure = async () => {
     setLoadingAzure(true); setAzureMsg("");
     try {
-      const res = await fetch(`${API_URL}/integrations/azure/audit?inactive_days=90`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_URL}/integrations/azure/audit?inactive_days=90`, { headers: h });
       if (!res.ok) { const d = await res.json(); setAzureMsg(d.detail ?? `Erro ${res.status}`); return; }
       const data = await res.json();
       setAzureUsers(data.inactive_users ?? []);
-      if ((data.inactive_users ?? []).length === 0) setAzureMsg("Nenhum usuário inativo encontrado.");
-    } catch (e: any) {
-      setAzureMsg(e.message?.includes("fetch") ? "Servidor indisponível." : e.message);
-    } finally { setLoadingAzure(false); }
+      if (!(data.inactive_users ?? []).length) setAzureMsg("Nenhum usuário inativo encontrado.");
+    } catch { setAzureMsg("Servidor indisponível."); }
+    finally { setLoadingAzure(false); }
   };
 
+  const btnCls = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50";
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Painel de Controle</h1>
-        <p className="text-muted-foreground text-sm">Gerencie o motor de busca e integrações do Sentinel 360.</p>
+        <h2 className="text-xl font-bold flex items-center gap-2">
+          <Zap className="h-5 w-5 text-primary" />
+          Painel de Controle
+        </h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Gerencie o motor de varredura e as integrações do Sentinel 360.
+        </p>
       </div>
 
-      {/* Motor de Varredura */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
-            Motor de Varredura Local
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Análise profunda de arquivos inativos e documentos sensíveis (LGPD).
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Scan engine */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Zap className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Motor de Varredura Local</p>
+            <p className="text-xs text-muted-foreground">Análise de arquivos inativos e documentos sensíveis (LGPD)</p>
+          </div>
+          {scanPhase === "done" && (
+            <span className="ml-auto flex items-center gap-1.5 text-xs text-[#3fb950] font-medium">
+              <CheckCircle2 className="h-3.5 w-3.5" />Concluído
+            </span>
+          )}
+        </div>
+        <div className="p-5 space-y-4">
           <div className="flex items-end gap-3 flex-wrap">
             <div>
-              <label className="text-xs font-medium text-muted-foreground block mb-1">Inatividade (dias)</label>
-              <Input
-                type="number"
-                min={1}
-                max={3650}
-                value={days}
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Limiar de inatividade (dias)
+              </label>
+              <input
+                type="number" min={1} max={3650} value={days}
                 onChange={e => setDays(Number(e.target.value))}
-                className="w-32"
                 disabled={scanPhase === "scanning"}
+                className="w-28 h-9 px-3 rounded-lg border border-border bg-secondary text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 disabled:opacity-50 transition-colors"
               />
             </div>
             {scanPhase !== "scanning" ? (
-              <Button
-                onClick={handleStartScan}
-                className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-              >
-                <Play className="h-4 w-4" /> Iniciar Scan
-              </Button>
+              <button onClick={handleStartScan}
+                className={`${btnCls} bg-primary text-primary-foreground hover:bg-primary/90`}>
+                <Play className="h-4 w-4" />
+                Iniciar Scan
+              </button>
             ) : (
-              <Button disabled variant="secondary" className="flex items-center gap-2 cursor-not-allowed">
-                <RefreshCw className="h-4 w-4 animate-spin" /> Varrendo arquivos...
-              </Button>
+              <button disabled className={`${btnCls} bg-secondary text-muted-foreground cursor-not-allowed`}>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                Varrendo...
+              </button>
             )}
           </div>
 
-          {scanPhase === "error" && scanMsg && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          {scanPhase === "error" && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 shrink-0" />{scanMsg}
             </div>
           )}
 
           {(scanPhase === "scanning" || scanPhase === "done") && (
-            <div className="space-y-2 p-4 rounded-lg border bg-secondary/30">
-              <div className="flex justify-between text-xs font-medium">
-                <span className={`flex items-center gap-1 ${scanPhase === "scanning" ? "text-blue-600" : "text-green-600"}`}>
-                  {scanPhase === "scanning" ? (
-                    <><RefreshCw className="h-3 w-3 animate-spin" />Varredura em andamento...</>
-                  ) : (
-                    <><CheckCircle2 className="h-3 w-3" />Concluído!</>
-                  )}
+            <div className="p-4 rounded-lg border border-border bg-secondary/30 space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className={`flex items-center gap-1.5 font-medium ${scanPhase === "scanning" ? "text-[#58a6ff]" : "text-[#3fb950]"}`}>
+                  {scanPhase === "scanning"
+                    ? <><RefreshCw className="h-3 w-3 animate-spin" />Escaneando arquivos...</>
+                    : <><CheckCircle2 className="h-3 w-3" />Varredura concluída</>}
                 </span>
-                <span className="text-muted-foreground">
-                  {scanProcessed.toLocaleString("pt-BR")} / {scanTotal > 0 ? scanTotal.toLocaleString("pt-BR") : "?"} arquivos &nbsp;•&nbsp; {progress.toFixed(0)}%
+                <span className="text-muted-foreground tabular-nums">
+                  {scanProcessed.toLocaleString("pt-BR")} / {scanTotal > 0 ? scanTotal.toLocaleString("pt-BR") : "?"} &nbsp;•&nbsp; {progress.toFixed(0)}%
                 </span>
               </div>
-              <div className="h-4 bg-secondary rounded-full overflow-hidden border">
+              <div className="h-2 bg-secondary rounded-full overflow-hidden">
                 <div
-                  className={`h-4 rounded-full transition-all duration-700 ${
-                    scanPhase === "done" ? "bg-green-500" : "bg-blue-500 animate-pulse"
-                  }`}
+                  className={`h-2 rounded-full transition-all duration-700 ${scanPhase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
                   style={{ width: `${Math.max(2, Math.min(progress, 100))}%` }}
                 />
               </div>
-              {scanPhase === "done" && (
-                <p className="text-sm text-green-700 mt-1">{scanMsg}</p>
-              )}
+              {scanPhase === "done" && <p className="text-xs text-[#3fb950]">{scanMsg}</p>}
             </div>
           )}
 
           {scanPhase === "idle" && (
-            <div className="border border-dashed rounded-lg p-4 text-center text-sm text-muted-foreground">
-              O motor está em espera. Clique em <strong>Iniciar Scan</strong> para começar a varredura.
+            <div className="border border-dashed border-border rounded-lg p-4 text-center text-sm text-muted-foreground">
+              Motor em espera. Clique em <strong className="text-foreground">Iniciar Scan</strong> para começar.
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Microsoft 365 */}
-      <Card>
-        <CardHeader className="pb-2 cursor-pointer" onClick={() => setMs365Open(!ms365Open)}>
-          <CardTitle className="text-base flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-blue-500" />
-              Microsoft 365
-              <span className="text-xs font-normal text-muted-foreground ml-1">(Exchange, SharePoint, Teams)</span>
-            </span>
-            {ms365Open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Audite emails, arquivos do SharePoint e arquivos compartilhados externamente.
-          </p>
-        </CardHeader>
-        {ms365Open && (
-          <CardContent className="space-y-4 pt-0">
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-700 space-y-1">
-              <p className="font-medium">Permissões necessárias no App Registration:</p>
-              <code className="block bg-white/60 rounded px-2 py-1">Mail.Read, Sites.Read.All, Files.Read.All</code>
-            </div>
-            <div className="grid gap-3">
-              <div>
-                <label className="text-xs font-medium block mb-1">Directory (Tenant) ID</label>
-                <Input
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  value={ms365Tenant}
-                  onChange={e => setMs365Tenant(e.target.value)}
-                  disabled={ms365Status === "saving"}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium block mb-1">Application (Client) ID</label>
-                <Input
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  value={ms365Client}
-                  onChange={e => setMs365Client(e.target.value)}
-                  disabled={ms365Status === "saving"}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium block mb-1">Client Secret</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••••••••"
-                  value={ms365Secret}
-                  onChange={e => setMs365Secret(e.target.value)}
-                  disabled={ms365Status === "saving"}
-                />
-              </div>
-            </div>
-            {ms365Msg && (
-              <p className={`text-sm ${ms365Status === "ok" ? "text-green-700" : "text-red-700"}`}>{ms365Msg}</p>
+      {/* MS365 */}
+      <IntegrationCard
+        title="Microsoft 365"
+        subtitle="Exchange, SharePoint, Teams"
+        icon={<Building2 className="w-4 h-4" />}
+        color="#58a6ff"
+        open={ms365Open}
+        onToggle={() => setMs365Open(!ms365Open)}
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-[#58a6ff]/8 border border-[#58a6ff]/20 text-xs text-[#58a6ff] space-y-1">
+            <p className="font-semibold">Permissões necessárias no App Registration:</p>
+            <code className="block font-mono bg-black/20 rounded px-2 py-1">Mail.Read · Sites.Read.All · Files.Read.All</code>
+          </div>
+          <div className="grid gap-3">
+            <Field label="Directory (Tenant) ID" value={ms365Tenant} onChange={setMs365Tenant}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={ms365Status === "saving"} />
+            <Field label="Application (Client) ID" value={ms365Client} onChange={setMs365Client}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={ms365Status === "saving"} />
+            <Field label="Client Secret" type="password" value={ms365Secret} onChange={setMs365Secret}
+              placeholder="••••••••••••••" disabled={ms365Status === "saving"} />
+          </div>
+          {ms365Msg && (
+            <p className={`text-xs ${ms365Status === "ok" ? "text-[#3fb950]" : "text-destructive"}`}>{ms365Msg}</p>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={saveMs365} disabled={ms365Status === "saving"}
+              className={`${btnCls} bg-[#58a6ff]/10 border border-[#58a6ff]/30 text-[#58a6ff] hover:bg-[#58a6ff]/20`}>
+              {ms365Status === "saving" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+              Salvar credenciais M365
+            </button>
+            {ms365Status === "ok" && (
+              <button onClick={auditMs365} disabled={loadingMs365}
+                className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
+                {loadingMs365 ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                Verificar usuários inativos
+              </button>
             )}
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={saveMs365Config}
-                disabled={ms365Status === "saving"}
-                className="flex items-center gap-2"
-              >
-                {ms365Status === "saving" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                Salvar credenciais M365
-              </Button>
-              {ms365Status === "ok" && (
-                <Button
-                  variant="outline"
-                  onClick={auditMs365Users}
-                  disabled={loadingMs365}
-                  className="flex items-center gap-2"
-                >
-                  {loadingMs365 ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                  Verificar usuários inativos
-                </Button>
-              )}
-            </div>
-            {ms365Users.length > 0 && (
-              <div className="border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-secondary text-xs font-medium">
-                  {ms365Users.length} usuário(s) inativo(s) — Microsoft 365
-                </div>
-                <div className="divide-y divide-border max-h-56 overflow-y-auto">
-                  {ms365Users.map((u, i) => (
-                    <div key={i} className="px-3 py-2 flex items-center justify-between text-sm">
-                      <div>
-                        <p className="font-medium">{u.display_name}</p>
-                        <p className="text-xs text-muted-foreground">{u.email}</p>
-                      </div>
-                      <span className="text-xs text-amber-600 font-medium">
-                        {u.days_inactive >= 0 ? `${u.days_inactive}d inativo` : "nunca logou"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
+          </div>
+          {ms365Users.length > 0 && <UserList users={ms365Users} label="Microsoft 365" />}
+        </div>
+      </IntegrationCard>
 
       {/* Azure AD */}
-      <Card>
-        <CardHeader className="pb-2 cursor-pointer" onClick={() => setAzureOpen(!azureOpen)}>
-          <CardTitle className="text-base flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-indigo-500" />
-              Azure Active Directory
-              <span className="text-xs font-normal text-muted-foreground ml-1">(Identidade, Usuários, Grupos)</span>
+      <IntegrationCard
+        title="Azure Active Directory"
+        subtitle="Identidade, Usuários, Grupos"
+        icon={<Users className="w-4 h-4" />}
+        color="#bc8cff"
+        open={azureOpen}
+        onToggle={() => setAzureOpen(!azureOpen)}
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-[#bc8cff]/8 border border-[#bc8cff]/20 text-xs text-[#bc8cff] space-y-1">
+            <p className="font-semibold">Permissões necessárias no App Registration:</p>
+            <code className="block font-mono bg-black/20 rounded px-2 py-1">User.Read.All · Directory.Read.All · AuditLog.Read.All</code>
+            <p className="mt-1 text-[#bc8cff]/70">Conceda <strong>admin consent</strong> para a organização após adicionar as permissões.</p>
+          </div>
+          <div className="grid gap-3">
+            <Field label="Directory (Tenant) ID" value={azureTenant} onChange={setAzureTenant}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={azureStatus === "saving"} />
+            <Field label="Application (Client) ID" value={azureClient} onChange={setAzureClient}
+              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" disabled={azureStatus === "saving"} />
+            <Field label="Client Secret" type="password" value={azureSecret} onChange={setAzureSecret}
+              placeholder="••••••••••••••" disabled={azureStatus === "saving"} />
+          </div>
+          {azureMsg && (
+            <p className={`text-xs ${azureStatus === "ok" ? "text-[#3fb950]" : "text-destructive"}`}>{azureMsg}</p>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={saveAzure} disabled={azureStatus === "saving"}
+              className={`${btnCls} bg-[#bc8cff]/10 border border-[#bc8cff]/30 text-[#bc8cff] hover:bg-[#bc8cff]/20`}>
+              {azureStatus === "saving" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+              Salvar credenciais Azure AD
+            </button>
+            {azureStatus === "ok" && (
+              <button onClick={auditAzure} disabled={loadingAzure}
+                className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
+                {loadingAzure ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                Auditar contas inativas (90d)
+              </button>
+            )}
+          </div>
+          {azureUsers.length > 0 && <UserList users={azureUsers} label="Azure AD" />}
+        </div>
+      </IntegrationCard>
+    </div>
+  );
+}
+
+function UserList({ users, label }: { users: any[]; label: string }) {
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <div className="px-3 py-2 bg-secondary/40 text-xs font-medium text-muted-foreground">
+        {users.length} usuário(s) inativo(s) — {label}
+      </div>
+      <div className="divide-y divide-border max-h-52 overflow-y-auto">
+        {users.map((u, i) => (
+          <div key={i} className="px-3 py-2.5 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">{u.display_name}</p>
+              <p className="text-xs text-muted-foreground">{u.email}</p>
+            </div>
+            <span className="text-xs font-medium text-[#d29922]">
+              {u.days_inactive >= 0 ? `${u.days_inactive}d inativo` : "nunca logou"}
             </span>
-            {azureOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Audite contas de usuário, grupos de segurança e contas sem MFA ativado.
-          </p>
-        </CardHeader>
-        {azureOpen && (
-          <CardContent className="space-y-4 pt-0">
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-700 space-y-1">
-              <p className="font-medium">Permissões necessárias no App Registration:</p>
-              <code className="block bg-white/60 rounded px-2 py-1">
-                User.Read.All, Directory.Read.All, AuditLog.Read.All
-              </code>
-              <p className="mt-1">
-                Conceda <strong>admin consent</strong> para a organização após adicionar as permissões.
-              </p>
-            </div>
-            <div className="grid gap-3">
-              <div>
-                <label className="text-xs font-medium block mb-1">Directory (Tenant) ID</label>
-                <Input
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  value={azureTenant}
-                  onChange={e => setAzureTenant(e.target.value)}
-                  disabled={azureStatus === "saving"}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium block mb-1">Application (Client) ID</label>
-                <Input
-                  placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                  value={azureClient}
-                  onChange={e => setAzureClient(e.target.value)}
-                  disabled={azureStatus === "saving"}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium block mb-1">Client Secret</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••••••••"
-                  value={azureSecret}
-                  onChange={e => setAzureSecret(e.target.value)}
-                  disabled={azureStatus === "saving"}
-                />
-              </div>
-            </div>
-            {azureMsg && (
-              <p className={`text-sm ${azureStatus === "ok" ? "text-green-700" : "text-red-700"}`}>{azureMsg}</p>
-            )}
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={saveAzureConfig}
-                disabled={azureStatus === "saving"}
-                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white"
-              >
-                {azureStatus === "saving" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
-                Salvar credenciais Azure AD
-              </Button>
-              {azureStatus === "ok" && (
-                <Button
-                  variant="outline"
-                  onClick={auditAzureUsers}
-                  disabled={loadingAzure}
-                  className="flex items-center gap-2"
-                >
-                  {loadingAzure ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                  Auditar contas inativas (90d)
-                </Button>
-              )}
-            </div>
-            {azureUsers.length > 0 && (
-              <div className="border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-secondary text-xs font-medium">
-                  {azureUsers.length} conta(s) inativa(s) — Azure AD
-                </div>
-                <div className="divide-y divide-border max-h-56 overflow-y-auto">
-                  {azureUsers.map((u, i) => (
-                    <div key={i} className="px-3 py-2 flex items-center justify-between text-sm">
-                      <div>
-                        <p className="font-medium">{u.display_name}</p>
-                        <p className="text-xs text-muted-foreground">{u.email}</p>
-                      </div>
-                      <span className="text-xs text-amber-600 font-medium">
-                        {u.days_inactive >= 0 ? `${u.days_inactive}d inativo` : "nunca logou"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

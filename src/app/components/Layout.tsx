@@ -1,129 +1,120 @@
 import { useState } from "react";
-import { Outlet, NavLink } from "react-router";
+import { Outlet, NavLink, useLocation } from "react-router";
 import {
-  LayoutDashboard,
-  FolderClock,
-  ShieldAlert,
-  Cloud,
-  FileText,
-  Search,
-  Bell,
-  LogOut,
-  User,
+  LayoutDashboard, FolderClock, ShieldAlert,
+  Zap, FileBarChart2, LogOut, User,
+  ChevronLeft, ChevronRight, Bell, Shield,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
+const NAV = [
+  { to: "/",               icon: LayoutDashboard, label: "Dashboard",         end: true  },
+  { to: "/inactive-files", icon: FolderClock,     label: "Arquivos Inativos", end: false },
+  { to: "/sensitive-data", icon: ShieldAlert,     label: "Dados Sensíveis",   end: false },
+  { to: "/integrations",   icon: Zap,             label: "Integrações",       end: false },
+  { to: "/reports",        icon: FileBarChart2,   label: "Relatórios",        end: false },
+];
+
 export function Layout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const { logout } = useAuth();
+  const location = useLocation();
+
+  const pageTitle = NAV.find(n =>
+    n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)
+  )?.label ?? "Sentinel360";
 
   return (
-    <div className="flex h-screen bg-white text-neutral-800 font-sans">
+    <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
-      <aside
-        className={`${
-          isSidebarOpen ? "w-64" : "w-20"
-        } bg-white border-r border-neutral-100 flex flex-col transition-all duration-300 relative z-20`}
-      >
-        <div className="p-4 h-16 flex items-center shrink-0">
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="flex items-center gap-3 overflow-hidden focus:outline-none w-full text-left group"
-            title="Recolher/Expandir menu"
-          >
-            <div className="w-10 h-10 min-w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 group-hover:bg-emerald-100 transition-colors">
-              <ShieldAlert className="w-6 h-6" />
+      <aside className={`${collapsed ? "w-16" : "w-56"} flex flex-col bg-[#080d14] border-r border-border transition-all duration-200 shrink-0 relative z-20`}>
+
+        {/* Logo */}
+        <div className={`h-14 flex items-center shrink-0 border-b border-border ${collapsed ? "justify-center px-0" : "px-4 gap-3"}`}>
+          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+            <Shield className="w-4 h-4 text-primary" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground leading-none">Sentinel360</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-widest">Cyber Defense</p>
             </div>
-            {isSidebarOpen && (
-              <div className="whitespace-nowrap flex-1">
-                <h1 className="font-bold text-lg text-neutral-900 leading-tight">Sentinel360</h1>
-                <p className="text-[10px] text-neutral-500 font-medium tracking-wide uppercase">Cyber Defense</p>
-              </div>
-            )}
-          </button>
+          )}
         </div>
 
-        <nav className="flex-1 py-4 px-3 overflow-y-auto">
-          <div className="space-y-1">
-            {[
-              { to: "/", label: "Dashboard", icon: <LayoutDashboard className="w-5 h-5 min-w-5" />, end: true },
-              { to: "/inactive-files", label: "Arquivos Inativos", icon: <FolderClock className="w-5 h-5 min-w-5" /> },
-              { to: "/sensitive-data", label: "Dados Sensíveis", icon: <ShieldAlert className="w-5 h-5 min-w-5" /> },
-              { to: "/integrations", label: "Integrações", icon: <Cloud className="w-5 h-5 min-w-5" /> },
-              { to: "/reports", label: "Relatórios", icon: <FileText className="w-5 h-5 min-w-5" /> },
-            ].map(({ to, label, icon, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                title={label}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                    isActive
-                      ? "bg-emerald-50 text-emerald-600 font-medium"
-                      : "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-50"
-                  }`
-                }
-              >
-                {icon}
-                {isSidebarOpen && <span>{label}</span>}
-              </NavLink>
-            ))}
-          </div>
+        {/* Nav */}
+        <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
+          {NAV.map(({ to, icon: Icon, label, end }) => (
+            <NavLink
+              key={to} to={to} end={end}
+              title={collapsed ? label : undefined}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-2.5 py-2 rounded-md text-sm transition-colors ${collapsed ? "justify-center" : ""} ${
+                  isActive
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                }`
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </NavLink>
+          ))}
         </nav>
 
-        <div className="p-4 mb-2 border-t border-neutral-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 min-w-10 bg-neutral-50 rounded-full flex items-center justify-center text-neutral-500">
-              <User className="w-5 h-5" />
-            </div>
-            {isSidebarOpen && (
-              <div className="flex-1 min-w-0 overflow-hidden">
-                <p className="text-sm font-semibold text-neutral-900 truncate">Admin</p>
-                <p className="text-xs text-neutral-400 truncate">Sentinel360</p>
-              </div>
-            )}
-            <button
-              onClick={logout}
-              title="Sair"
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            >
+        {/* Collapse toggle */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-[3.25rem] w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors z-30"
+          title={collapsed ? "Expandir" : "Recolher"}
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+        </button>
+
+        {/* User / logout */}
+        <div className={`p-2 border-t border-border ${collapsed ? "flex justify-center" : ""}`}>
+          {collapsed ? (
+            <button onClick={logout} title="Sair"
+              className="w-9 h-9 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
               <LogOut className="w-4 h-4" />
             </button>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-white/5 group">
+              <div className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0">
+                <User className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">Admin</p>
+                <p className="text-[10px] text-muted-foreground truncate">Sentinel360</p>
+              </div>
+              <button onClick={logout} title="Sair"
+                className="p-1 rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all">
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white">
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 flex items-center px-4 md:px-8 shrink-0 border-b border-neutral-100 relative z-10">
-          <div className="flex items-center justify-between w-full gap-4">
-            <div className="flex items-center gap-4 flex-1">
-              <div className="max-w-xl w-full">
-                <div className="relative group">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-neutral-400 group-focus-within:text-emerald-500 transition-colors" />
-                  <input
-                    type="text"
-                    placeholder="Buscar arquivos, pastas ou relatórios..."
-                    className="w-full pl-9 pr-4 py-2.5 bg-neutral-50/50 hover:bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-neutral-400"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 shrink-0">
-              <button className="relative p-2.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50 rounded-xl transition-all">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full" />
-              </button>
-            </div>
+        <header className="h-14 flex items-center justify-between px-6 border-b border-border bg-background/80 backdrop-blur-sm shrink-0">
+          <div>
+            <h1 className="text-sm font-semibold text-foreground">{pageTitle}</h1>
+            <p className="text-xs text-muted-foreground">Sentinel360 — Cyber Defense Platform</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="relative w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
+            </button>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 overflow-auto p-4 md:px-8 md:pb-8">
-          <div className="max-w-7xl mx-auto">
+        {/* Content */}
+        <main className="flex-1 overflow-auto">
+          <div className="max-w-7xl mx-auto px-6 py-6">
             <Outlet />
           </div>
         </main>

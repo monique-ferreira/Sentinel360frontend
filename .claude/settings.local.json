@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(anthropic-skills:docx)",
+      "Skill(anthropic-skills:docx:*)",
+      "Read(//c/Users/moniq/Downloads/**)",
+      "Bash(extract-text Relatorio_Sentinel360.docx)",
+      "Bash(pandoc Relatorio_Sentinel360.docx -t markdown)",
+      "Bash(pandoc \"C:\\\\Users\\\\moniq\\\\Downloads\\\\Relatorio_Sentinel360.docx\" -t markdown)",
+      "Bash(python \"C:/Users/moniq/Sentinel360frontend/.claude/worktrees/magical-noether-1cfa6c/scripts/office/unpack.py\" \"C:/Users/moniq/Downloads/Relatorio_Sentinel360.docx\" \"C:/Users/moniq/Downloads/sentinel_unpacked/\")",
+      "Bash(Get-ChildItem -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(ConvertTo-Json -Depth 100)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

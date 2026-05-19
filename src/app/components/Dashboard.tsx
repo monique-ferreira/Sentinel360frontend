@@ -1,38 +1,62 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/app/components/ui/card";
-import { ShieldAlert, FileX, AlertTriangle, HardDrive, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import {
+  HardDrive, FolderClock, ShieldAlert, Database,
+  RefreshCw, WifiOff, TrendingUp, ArrowUpRight,
+} from "lucide-react";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
+} from "recharts";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
-function StatCard({ title, value, subtitle, icon, color = "default" }: {
-  title: string; value: string; subtitle?: string; icon: React.ReactNode; color?: string;
-}) {
-  const bg: Record<string, string> = {
-    default: "bg-card",
-    danger: "bg-red-50",
-    warning: "bg-amber-50",
-    info: "bg-blue-50",
-  };
-  const tx: Record<string, string> = {
-    default: "text-foreground",
-    danger: "text-red-600",
-    warning: "text-amber-600",
-    info: "text-blue-600",
-  };
+const RISK_COLORS: Record<string, string> = {
+  Credencial:      "#f85149",
+  "Token/Key":     "#d29922",
+  CPF:             "#f85149",
+  "Chave Privada": "#bc8cff",
+  Email:           "#58a6ff",
+  NENHUM:          "#3fb950",
+  Nenhum:          "#3fb950",
+};
+
+function StatCard({
+  title, value, sub, icon, color,
+}: { title: string; value: string; sub: string; icon: React.ReactNode; color: string }) {
   return (
-    <Card className={bg[color]}>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <span className={`${tx[color]} opacity-70`}>{icon}</span>
+    <div className={`rounded-xl border border-border bg-card p-5 relative overflow-hidden`}>
+      <div className={`absolute inset-0 opacity-[0.04] ${color}`} style={{ background: "currentColor" }} />
+      <div className="relative">
+        <div className="flex items-start justify-between mb-3">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</p>
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color} bg-current/10`}>
+            <div className="opacity-70">{icon}</div>
+          </div>
         </div>
-        <p className={`text-3xl font-semibold ${tx[color]}`}>{value}</p>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
-      </CardContent>
-    </Card>
+        <p className="text-3xl font-bold text-foreground tabular-nums">{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+      </div>
+    </div>
   );
 }
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="px-5 py-3.5 border-b border-border">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const tooltipStyle = {
+  contentStyle: { background: "#161b22", border: "1px solid rgba(240,246,252,0.1)", borderRadius: "8px", fontSize: "12px" },
+  labelStyle: { color: "#e6edf3" },
+  itemStyle: { color: "#7d8590" },
+};
 
 export function Dashboard() {
   const { token } = useAuth();
@@ -52,120 +76,170 @@ export function Dashboard() {
       setItems(data.items ?? []);
       setLastUpdate(new Date().toLocaleTimeString("pt-BR"));
     } catch (e: any) {
-      setError(
-        e.message?.includes("fetch")
-          ? "Servidor indisponível. Aguarde o servidor iniciar (30s)."
-          : e.message
-      );
+      setError(e.message?.includes("fetch") ? "Servidor indisponível. Aguarde 30s e tente novamente." : e.message);
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
-  const total = items.length;
-  const inativos = items.filter(i => i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive).length;
-  const comRiscos = items.filter(i => {
-    const r = i.riscos || i.Riscos || "";
-    return r && r !== "NENHUM" && r !== "Nenhum";
-  }).length;
-  const totalMB = items.reduce(
-    (s, i) => s + (parseFloat(i.tamanho_mb ?? i.Tamanho_MB ?? i.size_mb) || 0),
-    0
-  );
-  const topRiscos = items
-    .filter(i => {
-      const r = i.riscos || i.Riscos || "";
-      return r && r !== "NENHUM" && r !== "Nenhum";
-    })
-    .slice(0, 8);
+  const total   = items.length;
+  const inactive = items.filter(i => i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive).length;
+  const atRisk  = items.filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; }).length;
+  const totalMB = items.reduce((s, i) => s + (parseFloat(i.tamanho_mb ?? i.Tamanho_MB ?? i.size_mb) || 0), 0);
+
+  // Risk distribution for pie chart
+  const riskMap: Record<string, number> = {};
+  items.forEach(i => {
+    const r = i.riscos || i.Riscos || "Nenhum";
+    riskMap[r] = (riskMap[r] || 0) + 1;
+  });
+  const pieData = Object.entries(riskMap).map(([name, value]) => ({ name, value }));
+
+  // Top directories bar chart (top 6 paths)
+  const dirMap: Record<string, number> = {};
+  items.forEach(i => {
+    const path = (i.caminho || i.Caminho || i.path || "").split(/[\\/]/);
+    const dir = path.slice(0, -1).slice(-2).join("/") || "raiz";
+    dirMap[dir] = (dirMap[dir] || 0) + 1;
+  });
+  const barData = Object.entries(dirMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, count]) => ({ name: name.length > 20 ? "…" + name.slice(-18) : name, count }));
+
+  // Top risk files
+  const topRisk = items
+    .filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; })
+    .slice(0, 6);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
-          {lastUpdate && <p className="text-xs text-muted-foreground">Atualizado: {lastUpdate}</p>}
+          <p className="text-xs text-muted-foreground">
+            {lastUpdate ? `Atualizado às ${lastUpdate}` : "Carregando dados..."}
+          </p>
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md hover:bg-secondary disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Atualizar
+        <button onClick={load} disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors">
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          Atualizar
         </button>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-700">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-sm text-yellow-400">
           <WifiOff className="h-4 w-4 shrink-0" />{error}
         </div>
       )}
+
       {!error && !loading && total === 0 && (
-        <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-700">
-          <Wifi className="h-4 w-4 shrink-0" />
-          Nenhum scan realizado ainda. Vá em <strong className="mx-1">Integrações</strong> e clique em Iniciar Scan.
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 text-sm text-primary/80">
+          <TrendingUp className="h-4 w-4 shrink-0" />
+          Nenhum scan realizado ainda. Vá em <strong className="text-primary mx-1">Integrações</strong> e inicie um scan.
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Arquivos monitorados"
-          value={loading ? "—" : total.toLocaleString("pt-BR")}
-          subtitle="total detectado"
-          icon={<HardDrive className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Arquivos inativos"
-          value={loading ? "—" : inativos.toLocaleString("pt-BR")}
-          subtitle="+180 dias sem acesso"
-          icon={<FileX className="h-5 w-5" />}
-          color="warning"
-        />
-        <StatCard
-          title="Com riscos"
-          value={loading ? "—" : comRiscos.toLocaleString("pt-BR")}
-          subtitle="credenciais / tokens"
-          icon={<ShieldAlert className="h-5 w-5" />}
-          color="danger"
-        />
-        <StatCard
-          title="Storage total"
-          value={loading ? "—" : `${totalMB.toFixed(1)} MB`}
-          subtitle="em arquivos detectados"
-          icon={<AlertTriangle className="h-5 w-5" />}
-          color="info"
-        />
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard title="Total de arquivos"   value={loading ? "—" : total.toLocaleString("pt-BR")}  sub="monitorados"            icon={<HardDrive  className="w-4 h-4" />} color="text-[#58a6ff]" />
+        <StatCard title="Arquivos inativos"   value={loading ? "—" : inactive.toLocaleString("pt-BR")} sub="+180 dias sem acesso"  icon={<FolderClock className="w-4 h-4" />} color="text-[#d29922]" />
+        <StatCard title="Com riscos"          value={loading ? "—" : atRisk.toLocaleString("pt-BR")}  sub="credenciais / tokens"   icon={<ShieldAlert className="w-4 h-4" />} color="text-[#f85149]" />
+        <StatCard title="Storage detectado"   value={loading ? "—" : `${totalMB.toFixed(1)} MB`}     sub="em arquivos scaneados"  icon={<Database    className="w-4 h-4" />} color="text-[#3fb950]" />
       </div>
 
-      {topRiscos.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Arquivos com maior risco</CardTitle></CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-border">
-              {topRiscos.map((item, i) => (
-                <div key={i} className="flex items-center justify-between px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{item.nome || item.Arquivo || item.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.caminho || item.Caminho || item.path}</p>
+      {/* Charts row */}
+      {!loading && total > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* Bar chart */}
+          <Section title="Arquivos por diretório (top 6)">
+            <div className="p-5 h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(240,246,252,0.06)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#7d8590" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#7d8590" }} axisLine={false} tickLine={false} />
+                  <Tooltip {...tooltipStyle} />
+                  <Bar dataKey="count" fill="#3fb950" radius={[4, 4, 0, 0]} name="Arquivos" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Section>
+
+          {/* Pie chart */}
+          <div className="lg:col-span-2">
+            <Section title="Distribuição de riscos">
+              <div className="p-5 h-52 flex items-center gap-4">
+                <div className="flex-1 h-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={pieData} cx="50%" cy="50%" innerRadius="55%" outerRadius="80%"
+                        paddingAngle={3} dataKey="value" stroke="none">
+                        {pieData.map((entry, i) => (
+                          <Cell key={i} fill={RISK_COLORS[entry.name] ?? "#7d8590"} />
+                        ))}
+                      </Pie>
+                      <Tooltip {...tooltipStyle} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2 min-w-0 flex-shrink-0">
+                  {pieData.slice(0, 5).map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: RISK_COLORS[d.name] ?? "#7d8590" }} />
+                      <span className="text-xs text-muted-foreground truncate max-w-[90px]">{d.name}</span>
+                      <span className="text-xs font-medium text-foreground ml-auto">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Section>
+          </div>
+        </div>
+      )}
+
+      {/* Top risk files */}
+      {topRisk.length > 0 && (
+        <Section title="Arquivos com maior risco">
+          <div className="divide-y divide-border">
+            {topRisk.map((item, i) => {
+              const r = item.riscos || item.Riscos || "?";
+              const color = RISK_COLORS[r] ?? "#7d8590";
+              return (
+                <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-[#f85149]/10 flex items-center justify-center shrink-0">
+                    <ShieldAlert className="w-4 h-4 text-[#f85149]" />
                   </div>
-                  <div className="text-right shrink-0 ml-3">
-                    <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
-                      {item.riscos || item.Riscos || item.risk_level}
-                    </span>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {item.tamanho_mb ?? item.Tamanho_MB ?? item.size_mb} MB
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {item.nome || item.Arquivo || item.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {item.caminho || item.Caminho || item.path}
                     </p>
                   </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full border font-medium"
+                      style={{ color, borderColor: color + "40", background: color + "15" }}>
+                      {r}
+                    </span>
+                    <span className="text-xs text-muted-foreground w-14 text-right">
+                      {item.tamanho_mb ?? item.Tamanho_MB ?? item.size_mb} MB
+                    </span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground" />
+                  </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              );
+            })}
+          </div>
+        </Section>
       )}
 
       {loading && (
-        <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
-          <RefreshCw className="h-5 w-5 animate-spin" />Conectando ao servidor...
+        <div className="flex items-center justify-center py-16 text-muted-foreground gap-2.5">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Conectando ao servidor...</span>
         </div>
       )}
     </div>
