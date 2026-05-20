@@ -99,28 +99,52 @@ export function Integrations() {
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
-  // Verifica status da conta pessoal ao abrir e após callback OAuth
+  // Detecta retorno do OAuth (code na URL) e troca pelo token no backend
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code  = params.get("code");
+    const state = params.get("state");
+
+    if (code) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setPersonalOpen(true);
+      setPersonalConnecting(true);
+      fetch(`${API_URL}/auth/microsoft/exchange`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...h },
+        body: JSON.stringify({ code, state: state ?? "" }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d?.connected) {
+            setPersonalConnected(true);
+            setPersonalEmail(d.ms_email);
+            localStorage.setItem("ms_personal_email", d.ms_email);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setPersonalConnecting(false));
+      return;
+    }
+
+    // Restaura do localStorage
+    const saved = localStorage.getItem("ms_personal_email");
+    if (saved) { setPersonalConnected(true); setPersonalEmail(saved); }
+
+    // Confirma com o backend
     fetch(`${API_URL}/auth/microsoft/status`, { headers: h })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.connected) { setPersonalConnected(true); setPersonalEmail(d.ms_email); } })
+      .then(d => {
+        if (d?.connected) { setPersonalConnected(true); setPersonalEmail(d.ms_email); localStorage.setItem("ms_personal_email", d.ms_email); }
+      })
       .catch(() => {});
-
-    // Detecta retorno do OAuth via query string
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("ms_connected")) {
-      setPersonalConnected(true);
-      setPersonalEmail(params.get("ms_email") ?? "");
-      setPersonalOpen(true);
-      window.history.replaceState({}, "", window.location.pathname);
-    }
   }, []);
 
   const connectPersonal = async () => {
     setPersonalConnecting(true);
     try {
-      const res = await fetch(`${API_URL}/auth/microsoft/login?state=personal`, { headers: h });
-      if (!res.ok) return;
+      const res = await fetch(`${API_URL}/auth/microsoft/login`, { headers: h });
+      if (!res.ok) { setPersonalConnecting(false); return; }
       const { auth_url } = await res.json();
       window.location.href = auth_url;
     } catch { setPersonalConnecting(false); }
