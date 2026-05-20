@@ -4,11 +4,6 @@ import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
-const getStoredDays = () => {
-  const s = localStorage.getItem("sentinel360_inactivity_days");
-  return s ? parseInt(s, 10) : 180;
-};
-
 export function InactiveFiles() {
   const { token } = useAuth();
   const [allItems, setAllItems] = useState<any[]>([]);
@@ -16,17 +11,24 @@ export function InactiveFiles() {
   const [error, setError]       = useState("");
   const [search, setSearch]     = useState("");
   const [dateFrom, setDateFrom] = useState("");
-  const [threshold, setThreshold] = useState<number>(getStoredDays);
+  const [threshold, setThreshold] = useState<number>(180);
+
+  const h = { Authorization: `Bearer ${token}` };
 
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${API_URL}/results`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json();
+      const [resultsRes, settingsRes] = await Promise.all([
+        fetch(`${API_URL}/results`, { headers: h }),
+        fetch(`${API_URL}/user/settings`, { headers: h }),
+      ]);
+      if (!resultsRes.ok) throw new Error(`Erro ${resultsRes.status}`);
+      const data = await resultsRes.json();
       setAllItems(data.items ?? []);
+      if (settingsRes.ok) {
+        const s = await settingsRes.json();
+        if (s?.inactivity_days) setThreshold(s.inactivity_days);
+      }
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponível." : e.message);
     } finally { setLoading(false); }
@@ -34,9 +36,15 @@ export function InactiveFiles() {
 
   useEffect(() => { load(); }, []);
 
-  const saveThreshold = (v: number) => {
+  const saveThreshold = async (v: number) => {
     setThreshold(v);
-    localStorage.setItem("sentinel360_inactivity_days", String(v));
+    try {
+      await fetch(`${API_URL}/user/settings`, {
+        method: "PUT",
+        headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ inactivity_days: v }),
+      });
+    } catch { /* ignore */ }
   };
 
   // Apply threshold + search + date filters

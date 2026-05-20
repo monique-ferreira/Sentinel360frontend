@@ -1,24 +1,44 @@
-import { useState } from "react";
-import { Outlet, NavLink, useLocation } from "react-router";
+import { useState, useEffect } from "react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard, FolderClock, ShieldAlert,
   Zap, FileBarChart2, LogOut, User,
-  ChevronLeft, ChevronRight, Bell, Shield,
+  ChevronLeft, ChevronRight, Bell, Shield, Building2,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
-const NAV = [
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+
+const BASE_NAV = [
   { to: "/",               icon: LayoutDashboard, label: "Dashboard",         end: true  },
   { to: "/inactive-files", icon: FolderClock,     label: "Arquivos Inativos", end: false },
   { to: "/sensitive-data", icon: ShieldAlert,     label: "Dados Sensíveis",   end: false },
   { to: "/integrations",   icon: Zap,             label: "Integrações",       end: false },
   { to: "/reports",        icon: FileBarChart2,   label: "Relatórios",        end: false },
+  { to: "/profile",        icon: User,            label: "Perfil",            end: false },
 ];
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
-  const { logout } = useAuth();
-  const location = useLocation();
+  const { logout, token } = useAuth();
+  const location  = useLocation();
+  const navigate  = useNavigate();
+
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_URL}/user/me`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setUserProfile(d); })
+      .catch(() => {});
+  }, [token]);
+
+  const isAdmin = userProfile?.org_role === "admin" && userProfile?.account_type === "corporate";
+
+  const NAV = isAdmin
+    ? [...BASE_NAV, { to: "/workspace", icon: Building2, label: "Workspace", end: false }]
+    : BASE_NAV;
 
   const pageTitle = NAV.find(n =>
     n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)
@@ -80,13 +100,25 @@ export function Layout() {
             </button>
           ) : (
             <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-white/5 group">
-              <div className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0">
-                <User className="w-3.5 h-3.5 text-muted-foreground" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-foreground truncate">Admin</p>
-                <p className="text-[10px] text-muted-foreground truncate">Sentinel360</p>
-              </div>
+              <button
+                onClick={() => navigate("/profile")}
+                title="Ver perfil"
+                className="w-7 h-7 rounded-full bg-secondary border border-border flex items-center justify-center shrink-0 hover:border-primary/40 transition-colors"
+              >
+                {userProfile?.username
+                  ? <span className="text-xs font-medium text-muted-foreground">{userProfile.username[0]?.toUpperCase()}</span>
+                  : <User className="w-3.5 h-3.5 text-muted-foreground" />}
+              </button>
+              <button onClick={() => navigate("/profile")} className="flex-1 min-w-0 text-left">
+                <p className="text-xs font-medium text-foreground truncate">
+                  {userProfile?.username ?? "Usuário"}
+                </p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {userProfile?.account_type === "corporate"
+                    ? (userProfile?.org_name ?? "Corporativo")
+                    : "Pessoal"}
+                </p>
+              </button>
               <button onClick={logout} title="Sair"
                 className="p-1 rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all">
                 <LogOut className="w-3.5 h-3.5" />

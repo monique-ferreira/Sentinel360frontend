@@ -5,6 +5,8 @@ import { InactiveFiles } from "./components/InactiveFiles";
 import { SensitiveData } from "./components/SensitiveData";
 import { Integrations } from "./components/Integrations";
 import { Reports } from "./components/Reports";
+import { Profile } from "./components/Profile";
+import { Workspace } from "./components/Workspace";
 
 export const router = createBrowserRouter([
   {
@@ -16,6 +18,8 @@ export const router = createBrowserRouter([
       { path: "sensitive-data", Component: SensitiveData },
       { path: "integrations", Component: Integrations },
       { path: "reports", Component: Reports },
+      { path: "profile", Component: Profile },
+      { path: "workspace", Component: Workspace },
     ],
   },
 ]);
