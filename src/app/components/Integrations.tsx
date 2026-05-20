@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import {
   RefreshCw, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Shield, Users, Building2, Zap,
-  Cloud, BarChart3, Download, UserCircle, LogIn,
+  Cloud, BarChart3, Download, UserCircle, LogIn, Clock, FileSearch,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
@@ -56,8 +56,10 @@ function IntegrationCard({
 export function Integrations() {
   const { token } = useAuth();
 
-  const [days, setDays] = useState(180);
+  const [inactivityDays, setInactivityDays] = useState(180);
+  const [filterDateFrom, setFilterDateFrom] = useState("");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scanSectionRef = useRef<HTMLDivElement>(null);
 
   // Conta pessoal Microsoft
   const [personalOpen, setPersonalOpen] = useState(false);
@@ -87,11 +89,13 @@ export function Integrations() {
 
   // Cloud scan
   const [cloudPhase, setCloudPhase] = useState<CloudPhase>("idle");
-  const [cloudProvider, setCloudProvider] = useState<"ms365" | "azure">("ms365");
+  const [cloudProvider, setCloudProvider] = useState<"ms365" | "azure" | "personal">("ms365");
   const [cloudProgress, setCloudProgress] = useState(0);
   const [cloudMsg, setCloudMsg] = useState("");
   const [cloudFiles, setCloudFiles] = useState<any[]>([]);
   const [loadingCloudFiles, setLoadingCloudFiles] = useState(false);
+  const [processedFiles, setProcessedFiles] = useState(0);
+  const [etaSeconds, setEtaSeconds] = useState(-1);
   const cloudPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [biLoading, setBiLoading] = useState(false);
 
@@ -205,10 +209,20 @@ export function Integrations() {
   const stopCloudPoll = () => { if (cloudPollRef.current) { clearInterval(cloudPollRef.current); cloudPollRef.current = null; } };
 
   const startCloudScan = async (provider: "ms365" | "azure" | "personal") => {
-    setCloudProvider(provider as any); setCloudPhase("scanning"); setCloudProgress(0); setCloudMsg(""); setCloudFiles([]);
+    setCloudProvider(provider);
+    setCloudPhase("scanning");
+    setCloudProgress(0);
+    setCloudMsg("");
+    setCloudFiles([]);
+    setProcessedFiles(0);
+    setEtaSeconds(-1);
+
+    // Scroll to progress section smoothly
+    setTimeout(() => scanSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+
     const endpoint = provider === "ms365" ? "office365" : provider === "azure" ? "azure" : "personal";
     try {
-      const res = await fetch(`${API_URL}/integrations/${endpoint}/scan-files?days=180`, {
+      const res = await fetch(`${API_URL}/integrations/${endpoint}/scan-files?days=${inactivityDays}`, {
         method: "POST", headers: h,
       });
       if (!res.ok) { const d = await res.json(); setCloudPhase("error"); setCloudMsg(d.detail ?? `Erro ${res.status}`); return; }
@@ -219,6 +233,8 @@ export function Integrations() {
           if (!s.ok) return;
           const d = await s.json();
           setCloudProgress(d.progress ?? 0);
+          setProcessedFiles(d.processed_files ?? 0);
+          setEtaSeconds(d.eta_seconds ?? -1);
           if (d.error) { setCloudPhase("error"); setCloudMsg(d.error); stopCloudPoll(); return; }
           if (!d.is_scanning) {
             setCloudPhase("done");
@@ -243,16 +259,20 @@ export function Integrations() {
     finally { setLoadingCloudFiles(false); }
   };
 
-  const openBiReport = async () => {
+  const downloadBiReport = async () => {
     setBiLoading(true);
     try {
       const res = await fetch(`${API_URL}/report/bi`, { headers: h });
       if (!res.ok) { alert("Erro ao gerar relatório BI."); return; }
-      const html = await res.text();
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `sentinel360_bi_${Date.now()}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch { alert("Servidor indisponível."); }
     finally { setBiLoading(false); }
   };
@@ -263,14 +283,26 @@ export function Integrations() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
-          Painel de Controle
-        </h2>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Gerencie o motor de varredura e as integrações do Sentinel 360.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Zap className="h-5 w-5 text-primary" />
+            Painel de Controle
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Gerencie o motor de varredura e as integrações do Sentinel 360.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Clock className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Inativo após</span>
+          <input
+            type="number" min={1} max={3650} value={inactivityDays}
+            onChange={e => setInactivityDays(Math.max(1, Number(e.target.value)))}
+            className="w-16 h-8 px-2 rounded-lg border border-border bg-secondary text-sm text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          <span className="text-xs text-muted-foreground">dias sem acesso</span>
+        </div>
       </div>
 
       {/* Conta pessoal Microsoft */}
@@ -432,16 +464,19 @@ export function Integrations() {
 
       {/* Cloud scan section */}
       {(cloudPhase !== "idle") && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div ref={scanSectionRef} className="rounded-xl border border-border bg-card overflow-hidden scroll-mt-4">
           <div className="px-5 py-4 border-b border-border flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#58a6ff]/10 border border-[#58a6ff]/20 flex items-center justify-center">
               <Cloud className="w-4 h-4 text-[#58a6ff]" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">
-                Varredura Cloud — {cloudProvider === "ms365" ? "SharePoint + OneDrive" : "OneDrive (Azure AD)"}
+                Varredura Cloud — {
+                  cloudProvider === "ms365" ? "SharePoint + OneDrive" :
+                  cloudProvider === "azure" ? "OneDrive (Azure AD)" : "OneDrive Pessoal"
+                }
               </p>
-              <p className="text-xs text-muted-foreground">Análise de arquivos sensíveis e inativos na nuvem</p>
+              <p className="text-xs text-muted-foreground">Limiar de inatividade: {inactivityDays} dias</p>
             </div>
             {cloudPhase === "done" && (
               <span className="ml-auto flex items-center gap-1.5 text-xs text-[#3fb950] font-medium">
@@ -463,14 +498,28 @@ export function Integrations() {
                       ? <><RefreshCw className="h-3 w-3 animate-spin" />Varrendo arquivos cloud...</>
                       : <><CheckCircle2 className="h-3 w-3" />{cloudMsg}</>}
                   </span>
-                  <span className="text-muted-foreground tabular-nums">{cloudProgress.toFixed(0)}%</span>
+                  <span className="text-muted-foreground tabular-nums">{Math.round(cloudProgress)}%</span>
                 </div>
                 <div className="h-2 bg-secondary rounded-full overflow-hidden">
                   <div
-                    className={`h-2 rounded-full transition-all duration-700 ${cloudPhase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
+                    className={`h-2 rounded-full transition-all duration-500 ${cloudPhase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
                     style={{ width: `${Math.max(2, Math.min(cloudProgress, 100))}%` }}
                   />
                 </div>
+                {cloudPhase === "scanning" && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <FileSearch className="h-3 w-3" />
+                      {processedFiles > 0 ? `${processedFiles} arquivo(s) analisado(s)` : "Iniciando varredura..."}
+                    </span>
+                    {etaSeconds > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        ~{etaSeconds < 60 ? `${etaSeconds}s` : `${Math.ceil(etaSeconds / 60)}min`} restante(s)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {cloudPhase === "done" && (
@@ -480,7 +529,13 @@ export function Integrations() {
                     <RefreshCw className="h-3 w-3 animate-spin" />Carregando resultados...
                   </div>
                 )}
-                {cloudFiles.length > 0 && <CloudFileTable files={cloudFiles} />}
+                {cloudFiles.length > 0 && (
+                  <CloudFileTable
+                    files={cloudFiles}
+                    filterDateFrom={filterDateFrom}
+                    onFilterDateChange={setFilterDateFrom}
+                  />
+                )}
                 {!loadingCloudFiles && cloudFiles.length === 0 && (
                   <p className="text-xs text-muted-foreground">Nenhum arquivo sensível ou inativo encontrado.</p>
                 )}
@@ -501,7 +556,7 @@ export function Integrations() {
             <p className="text-xs text-muted-foreground">Gráficos interativos de risco, inatividade e histórico de scans</p>
           </div>
         </div>
-        <button onClick={openBiReport} disabled={biLoading}
+        <button onClick={downloadBiReport} disabled={biLoading}
           className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20 shrink-0`}>
           {biLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Gerar Relatório BI
@@ -511,15 +566,34 @@ export function Integrations() {
   );
 }
 
-function CloudFileTable({ files }: { files: any[] }) {
-  const risky = files.filter(f => f.riscos && f.riscos !== "NENHUM");
-  const shown = files.slice(0, 100);
+function CloudFileTable({ files, filterDateFrom, onFilterDateChange }: {
+  files: any[];
+  filterDateFrom: string;
+  onFilterDateChange: (v: string) => void;
+}) {
+  const filtered = filterDateFrom
+    ? files.filter(f => f.last_scan && f.last_scan >= filterDateFrom)
+    : files;
+  const risky = filtered.filter(f => f.riscos && f.riscos !== "NENHUM");
+  const shown = filtered.slice(0, 200);
+
   return (
     <div className="rounded-lg border border-border overflow-hidden">
-      <div className="px-3 py-2 bg-secondary/40 flex items-center justify-between">
+      <div className="px-3 py-2 bg-secondary/40 flex flex-wrap items-center gap-3 justify-between">
         <span className="text-xs font-medium text-muted-foreground">
-          {files.length} item(ns) encontrado(s) — {risky.length} com risco
+          {filtered.length} item(ns){filterDateFrom ? ` (filtrado de ${files.length})` : ""} — {risky.length} com risco
         </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Desde</span>
+          <input
+            type="date" value={filterDateFrom} onChange={e => onFilterDateChange(e.target.value)}
+            className="h-7 px-2 rounded border border-border bg-secondary text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+          />
+          {filterDateFrom && (
+            <button onClick={() => onFilterDateChange("")}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors">✕</button>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto max-h-72 overflow-y-auto">
         <table className="w-full text-xs border-collapse">
@@ -556,9 +630,9 @@ function CloudFileTable({ files }: { files: any[] }) {
             ))}
           </tbody>
         </table>
-        {files.length > 100 && (
+        {filtered.length > 200 && (
           <p className="text-center text-xs text-muted-foreground py-2">
-            Mostrando 100 de {files.length} itens.
+            Mostrando 200 de {filtered.length} itens.
           </p>
         )}
       </div>
