@@ -4,7 +4,7 @@ import {
   CheckCircle2, Lock, Users, FileSearch, BarChart3,
 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 type View = "login" | "register" | "forgot";
 

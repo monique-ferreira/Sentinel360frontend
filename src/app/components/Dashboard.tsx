@@ -9,7 +9,7 @@ import {
 } from "recharts";
 import { useAuth } from "../AuthContext";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 const RISK_COLORS: Record<string, string> = {
   Credencial:      "#f85149",

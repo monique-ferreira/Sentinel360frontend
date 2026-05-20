@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Shield, AlertTriangle, FileClock, HardDrive, Activity, RefreshCw, Cpu, CheckCircle2 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 const RISK_COLORS: Record<string,string> = { critical:"#A32D2D",high:"#854F0B",medium:"#185FA5",low:"#3B6D11",none:"#5F5E5A" };
 const RISK_LABELS: Record<string,string> = { critical:"Critico",high:"Alto",medium:"Medio",low:"Baixo" };
 

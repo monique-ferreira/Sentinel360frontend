@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff, FileBarChart2, Search, Trash2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 const RISK_CFG: Record<string, { color: string }> = {
   "Credencial":      { color: "#f85149" },

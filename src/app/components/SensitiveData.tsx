@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff, ShieldAlert, Search, ShieldOff } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360-production.up.railway.app";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 interface RiskConfig { color: string; bg: string; border: string; }
 const RISK: Record<string, RiskConfig> = {
