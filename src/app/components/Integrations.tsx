@@ -134,7 +134,10 @@ function ScanStatus({
 export function Integrations() {
   const { token } = useAuth();
 
-  const [inactivityDays, setInactivityDays] = useState(180);
+  const [inactivityDays, setInactivityDays] = useState<number>(() => {
+    const saved = localStorage.getItem("sentinel360_inactivity_days");
+    return saved ? parseInt(saved, 10) : 180;
+  });
   const [filterDateFrom, setFilterDateFrom] = useState("");
 
   // Card refs for scroll-into-view
@@ -393,8 +396,9 @@ export function Integrations() {
             value={inactivityDays}
             onChange={e => {
               const v = parseInt(e.target.value.replace(/\D/g, ""), 10);
-              if (!isNaN(v) && v >= 1) setInactivityDays(v);
-              else if (e.target.value === "") setInactivityDays(1);
+              const val = !isNaN(v) && v >= 1 ? v : 1;
+              setInactivityDays(val);
+              localStorage.setItem("sentinel360_inactivity_days", String(val));
             }}
             className="w-14 h-7 px-2 rounded border border-border bg-secondary text-sm text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
