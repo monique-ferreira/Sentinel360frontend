@@ -24,16 +24,31 @@ export function Reports() {
   const [deleted, setDeleted] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("todos");
   const [riskFilter, setRiskFilter] = useState<"todos" | "com_risco" | "sem_risco">("todos");
+  const [threshold, setThreshold] = useState(180);
+
+  const h = { Authorization: `Bearer ${token}` };
+
+  const checkInactive = (i: any, thr: number) => {
+    const days = parseInt(i.dias_sem_acesso ?? "-1", 10);
+    if (days >= 0) return days >= thr;
+    return i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive;
+  };
 
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${API_URL}/results`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json();
+      const [resultsRes, settingsRes] = await Promise.all([
+        fetch(`${API_URL}/results`, { headers: h }),
+        fetch(`${API_URL}/user/settings`, { headers: h }),
+      ]);
+      if (!resultsRes.ok) throw new Error(`Erro ${resultsRes.status}`);
+      const data = await resultsRes.json();
       const all = (data.items ?? []).filter((i: any) => !deleted.includes(i.caminho || i.Caminho || i.path));
+      let thr = threshold;
+      if (settingsRes.ok) {
+        const s = await settingsRes.json();
+        if (s?.inactivity_days) { thr = s.inactivity_days; setThreshold(thr); }
+      }
       setItems(all); setFiltered(all);
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponível. Aguarde o servidor iniciar (30s)." : e.message);
@@ -44,8 +59,8 @@ export function Reports() {
 
   useEffect(() => {
     let result = items;
-    if (statusFilter === "ativo")   result = result.filter(i => !(i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive));
-    if (statusFilter === "inativo") result = result.filter(i =>  (i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive));
+    if (statusFilter === "ativo")   result = result.filter(i => !checkInactive(i, threshold));
+    if (statusFilter === "inativo") result = result.filter(i =>  checkInactive(i, threshold));
     if (riskFilter === "com_risco") result = result.filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; });
     if (riskFilter === "sem_risco") result = result.filter(i => { const r = i.riscos || i.Riscos || ""; return !r || r === "NENHUM" || r === "Nenhum"; });
     if (search.trim()) {
@@ -57,7 +72,7 @@ export function Reports() {
       );
     }
     setFiltered(result);
-  }, [search, statusFilter, riskFilter, items]);
+  }, [search, statusFilter, riskFilter, items, threshold]);
 
   const handleDelete = async (item: any) => {
     const path = item.caminho || item.Caminho || item.path;
@@ -170,7 +185,7 @@ export function Reports() {
             <tbody className="divide-y divide-border">
               {filtered.map((item, i) => {
                 const risco = item.riscos || item.Riscos || "";
-                const inativo = item.inativo === "SIM" || item.Inativo === "SIM" || item.is_inactive;
+                const inativo = checkInactive(item, threshold);
                 const hasRisk = risco && risco !== "NENHUM" && risco !== "Nenhum";
                 const path = item.caminho || item.Caminho || item.path;
                 const nome = item.nome || item.Arquivo || item.name;

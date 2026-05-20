@@ -64,17 +64,25 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastUpdate, setLastUpdate] = useState("");
+  const [threshold, setThreshold] = useState(180);
+
+  const h = { Authorization: `Bearer ${token}` };
 
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${API_URL}/results`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json();
+      const [resultsRes, settingsRes] = await Promise.all([
+        fetch(`${API_URL}/results`, { headers: h }),
+        fetch(`${API_URL}/user/settings`, { headers: h }),
+      ]);
+      if (!resultsRes.ok) throw new Error(`Erro ${resultsRes.status}`);
+      const data = await resultsRes.json();
       setItems(data.items ?? []);
       setLastUpdate(new Date().toLocaleTimeString("pt-BR"));
+      if (settingsRes.ok) {
+        const s = await settingsRes.json();
+        if (s?.inactivity_days) setThreshold(s.inactivity_days);
+      }
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponível. Aguarde 30s e tente novamente." : e.message);
     } finally { setLoading(false); }
@@ -82,8 +90,14 @@ export function Dashboard() {
 
   useEffect(() => { load(); }, []);
 
+  const isInactive = (i: any) => {
+    const days = parseInt(i.dias_sem_acesso ?? "-1", 10);
+    if (days >= 0) return days >= threshold;
+    return i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive;
+  };
+
   const total   = items.length;
-  const inactive = items.filter(i => i.inativo === "SIM" || i.Inativo === "SIM" || i.is_inactive).length;
+  const inactive = items.filter(isInactive).length;
   const atRisk  = items.filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; }).length;
   const totalMB = items.reduce((s, i) => s + (parseFloat(i.tamanho_mb ?? i.Tamanho_MB ?? i.size_mb) || 0), 0);
 
@@ -144,7 +158,7 @@ export function Dashboard() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard title="Total de arquivos"   value={loading ? "—" : total.toLocaleString("pt-BR")}  sub="monitorados"            icon={<HardDrive  className="w-4 h-4" />} color="text-[#58a6ff]" />
-        <StatCard title="Arquivos inativos"   value={loading ? "—" : inactive.toLocaleString("pt-BR")} sub="+180 dias sem acesso"  icon={<FolderClock className="w-4 h-4" />} color="text-[#d29922]" />
+        <StatCard title="Arquivos inativos"   value={loading ? "—" : inactive.toLocaleString("pt-BR")} sub={`+${threshold} dias sem acesso`}  icon={<FolderClock className="w-4 h-4" />} color="text-[#d29922]" />
         <StatCard title="Com riscos"          value={loading ? "—" : atRisk.toLocaleString("pt-BR")}  sub="credenciais / tokens"   icon={<ShieldAlert className="w-4 h-4" />} color="text-[#f85149]" />
         <StatCard title="Storage detectado"   value={loading ? "—" : `${totalMB.toFixed(1)} MB`}     sub="em arquivos scaneados"  icon={<Database    className="w-4 h-4" />} color="text-[#3fb950]" />
       </div>
