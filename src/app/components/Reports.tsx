@@ -66,11 +66,11 @@ export function Reports() {
     if (riskFilter === "com_risco") result = result.filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; });
     if (riskFilter === "sem_risco") result = result.filter(i => { const r = i.riscos || i.Riscos || ""; return !r || r === "NENHUM" || r === "Nenhum"; });
     if (dateFrom) result = result.filter(i => {
-      const d = (i.last_scan || i.Data || "").slice(0, 10);
+      const d = (i.ultimo_acesso || i.last_scan || "").slice(0, 10);
       return d >= dateFrom;
     });
     if (dateTo) result = result.filter(i => {
-      const d = (i.last_scan || i.Data || "").slice(0, 10);
+      const d = (i.ultimo_acesso || i.last_scan || "").slice(0, 10);
       return d <= dateTo;
     });
     if (search.trim()) {
@@ -159,7 +159,7 @@ export function Reports() {
           {/* Date range filter */}
           <div className="flex items-center gap-2 flex-wrap">
             <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="text-xs text-muted-foreground">Data do scan:</span>
+            <span className="text-xs text-muted-foreground">Último acesso:</span>
             <div className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border bg-card">
               <input
                 type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}

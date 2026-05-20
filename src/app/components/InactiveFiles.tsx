@@ -60,7 +60,7 @@ export function InactiveFiles() {
     const path  = (i.caminho || i.Caminho || i.path || "").toLowerCase();
     const q     = search.toLowerCase();
     const matchSearch = !search.trim() || name.includes(q) || path.includes(q);
-    const matchDate   = !dateFrom || (i.last_scan && i.last_scan >= dateFrom);
+    const matchDate   = !dateFrom || ((i.ultimo_acesso || i.last_scan || "") >= dateFrom);
     return matchSearch && matchDate;
   });
 
@@ -148,7 +148,7 @@ export function InactiveFiles() {
           </div>
           {/* Date filter */}
           <div className="flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Scan desde</span>
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Último acesso desde</span>
             <input
               type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
               className="h-7 bg-transparent text-xs text-foreground focus:outline-none"
@@ -187,7 +187,7 @@ export function InactiveFiles() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Arquivo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Caminho</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Dias sem acesso</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Último scan</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Último acesso</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tamanho</th>
               </tr>
             </thead>
@@ -219,7 +219,7 @@ export function InactiveFiles() {
                         : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
-                      {item.last_scan || item.Data || "—"}
+                      {item.ultimo_acesso || item.last_scan || item.Data || "—"}
                     </td>
                     <td className="px-4 py-3 text-right text-xs font-medium text-muted-foreground tabular-nums">
                       {item.tamanho_mb ?? item.Tamanho_MB ?? item.size_mb} MB
