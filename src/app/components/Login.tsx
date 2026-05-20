@@ -37,12 +37,15 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
     if (!loginUser.trim() || !loginPass.trim()) { setError("Preencha usuário e senha."); return; }
     setLoading(true); setError("");
     try {
+      console.log("[LOGIN] Tentando conectar em:", `${API_URL}/login`);
       const res = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: loginUser.trim(), password: loginPass }),
       });
+      console.log("[LOGIN] Status:", res.status);
       const data = await res.json();
+      console.log("[LOGIN] Resposta:", data);
       if (!res.ok) {
         if (res.status === 401) setError("Usuário ou senha incorretos.");
         else if (res.status === 403) setError("Conta desativada. Contate o administrador.");
@@ -51,8 +54,9 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
         return;
       }
       onLogin(data.access_token);
-    } catch {
-      setError("Não foi possível conectar ao servidor. Verifique sua conexão.");
+    } catch (err: any) {
+      console.error("[LOGIN] Erro de rede:", err);
+      setError(`Erro de conexão: ${err?.message ?? "verifique o console (F12)"}`);
     } finally { setLoading(false); }
   };
 
