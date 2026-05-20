@@ -206,11 +206,11 @@ export function Profile() {
           </label>
           <div className="flex items-center gap-2">
             <input
-              type="number" min={1} max={3650}
+              type="text" inputMode="numeric" pattern="[0-9]*"
               className="w-24 h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-colors"
               value={inactivityDays}
               onChange={e => {
-                const v = parseInt(e.target.value, 10);
+                const v = parseInt(e.target.value.replace(/\D/g, ""), 10);
                 if (!isNaN(v) && v >= 1) setInactivityDays(v);
               }}
               disabled={saveStatus === "saving"}
