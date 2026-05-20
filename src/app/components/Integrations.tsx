@@ -251,8 +251,8 @@ export function Integrations() {
 
       {/* Conta pessoal Microsoft */}
       <IntegrationCard
-        title="Conta Pessoal Microsoft"
-        subtitle="OneDrive pessoal — sem admin, login com sua conta"
+        title="Conta Microsoft Pessoal"
+        subtitle="OneDrive, arquivos e documentos pessoais"
         icon={<UserCircle className="w-4 h-4" />}
         color="#3fb950"
         open={personalOpen}
@@ -260,8 +260,8 @@ export function Integrations() {
       >
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-[#3fb950]/8 border border-[#3fb950]/20 text-xs text-[#3fb950] space-y-1">
-            <p className="font-semibold">Sem admin consent — funciona com qualquer conta Microsoft</p>
-            <p className="text-[#3fb950]/70">Acessa apenas os arquivos do OneDrive do usuário autenticado.</p>
+            <p className="font-semibold">Acesso via login Microsoft</p>
+            <code className="block font-mono bg-black/20 rounded px-2 py-1">OneDrive · Arquivos · Documentos pessoais</code>
           </div>
 
           {personalConnected ? (
