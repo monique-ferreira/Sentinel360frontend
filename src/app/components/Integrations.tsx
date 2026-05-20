@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import {
   RefreshCw, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Shield, Users, Building2, Zap,
-  Cloud, BarChart3, Download,
+  Cloud, BarChart3, Download, UserCircle, LogIn,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
@@ -59,6 +59,12 @@ export function Integrations() {
   const [days, setDays] = useState(180);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Conta pessoal Microsoft
+  const [personalOpen, setPersonalOpen] = useState(false);
+  const [personalConnected, setPersonalConnected] = useState(false);
+  const [personalEmail, setPersonalEmail] = useState("");
+  const [personalConnecting, setPersonalConnecting] = useState(false);
+
   // MS365
   const [ms365Open, setMs365Open] = useState(false);
   const [ms365Tenant, setMs365Tenant] = useState("");
@@ -92,6 +98,33 @@ export function Integrations() {
   const h = { Authorization: `Bearer ${token}` };
 
   const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  // Verifica status da conta pessoal ao abrir e após callback OAuth
+  useEffect(() => {
+    fetch(`${API_URL}/auth/microsoft/status`, { headers: h })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.connected) { setPersonalConnected(true); setPersonalEmail(d.ms_email); } })
+      .catch(() => {});
+
+    // Detecta retorno do OAuth via query string
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("ms_connected")) {
+      setPersonalConnected(true);
+      setPersonalEmail(params.get("ms_email") ?? "");
+      setPersonalOpen(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
+  const connectPersonal = async () => {
+    setPersonalConnecting(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/microsoft/login?state=personal`, { headers: h });
+      if (!res.ok) return;
+      const { auth_url } = await res.json();
+      window.location.href = auth_url;
+    } catch { setPersonalConnecting(false); }
+  };
 
   const saveMs365 = async () => {
     if (!ms365Tenant || !ms365Client || !ms365Secret) { setMs365Msg("Preencha todos os campos."); setMs365Status("error"); return; }
@@ -147,10 +180,11 @@ export function Integrations() {
 
   const stopCloudPoll = () => { if (cloudPollRef.current) { clearInterval(cloudPollRef.current); cloudPollRef.current = null; } };
 
-  const startCloudScan = async (provider: "ms365" | "azure") => {
-    setCloudProvider(provider); setCloudPhase("scanning"); setCloudProgress(0); setCloudMsg(""); setCloudFiles([]);
+  const startCloudScan = async (provider: "ms365" | "azure" | "personal") => {
+    setCloudProvider(provider as any); setCloudPhase("scanning"); setCloudProgress(0); setCloudMsg(""); setCloudFiles([]);
+    const endpoint = provider === "ms365" ? "office365" : provider === "azure" ? "azure" : "personal";
     try {
-      const res = await fetch(`${API_URL}/integrations/${provider === "ms365" ? "office365" : "azure"}/scan-files?days=180`, {
+      const res = await fetch(`${API_URL}/integrations/${endpoint}/scan-files?days=180`, {
         method: "POST", headers: h,
       });
       if (!res.ok) { const d = await res.json(); setCloudPhase("error"); setCloudMsg(d.detail ?? `Erro ${res.status}`); return; }
@@ -173,10 +207,10 @@ export function Integrations() {
     } catch { setCloudPhase("error"); setCloudMsg("Servidor indisponível."); }
   };
 
-  const fetchCloudFiles = async (provider: "ms365" | "azure") => {
+  const fetchCloudFiles = async (provider: "ms365" | "azure" | "personal") => {
     setLoadingCloudFiles(true);
     try {
-      const endpoint = provider === "ms365" ? "office365" : "azure";
+      const endpoint = provider === "ms365" ? "office365" : provider === "azure" ? "azure" : "personal";
       const res = await fetch(`${API_URL}/integrations/${endpoint}/file-results`, { headers: h });
       if (!res.ok) return;
       const d = await res.json();
@@ -214,6 +248,58 @@ export function Integrations() {
           Gerencie o motor de varredura e as integrações do Sentinel 360.
         </p>
       </div>
+
+      {/* Conta pessoal Microsoft */}
+      <IntegrationCard
+        title="Conta Pessoal Microsoft"
+        subtitle="OneDrive pessoal — sem admin, login com sua conta"
+        icon={<UserCircle className="w-4 h-4" />}
+        color="#3fb950"
+        open={personalOpen}
+        onToggle={() => setPersonalOpen(!personalOpen)}
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-[#3fb950]/8 border border-[#3fb950]/20 text-xs text-[#3fb950] space-y-1">
+            <p className="font-semibold">Sem admin consent — funciona com qualquer conta Microsoft</p>
+            <p className="text-[#3fb950]/70">Acessa apenas os arquivos do OneDrive do usuário autenticado.</p>
+          </div>
+
+          {personalConnected ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-[#3fb950]/8 border border-[#3fb950]/30">
+              <CheckCircle2 className="h-4 w-4 text-[#3fb950] shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">Conta conectada</p>
+                <p className="text-xs text-muted-foreground">{personalEmail}</p>
+              </div>
+            </div>
+          ) : (
+            <button onClick={connectPersonal} disabled={personalConnecting}
+              className={`${btnCls} bg-[#3fb950]/10 border border-[#3fb950]/30 text-[#3fb950] hover:bg-[#3fb950]/20 w-full justify-center`}>
+              {personalConnecting
+                ? <RefreshCw className="h-4 w-4 animate-spin" />
+                : <LogIn className="h-4 w-4" />}
+              Entrar com conta Microsoft
+            </button>
+          )}
+
+          {personalConnected && (
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => startCloudScan("personal" as any)} disabled={cloudPhase === "scanning"}
+                className={`${btnCls} bg-[#3fb950]/10 border border-[#3fb950]/30 text-[#3fb950] hover:bg-[#3fb950]/20`}>
+                {cloudPhase === "scanning" && cloudProvider === "personal"
+                  ? <RefreshCw className="h-4 w-4 animate-spin" />
+                  : <Cloud className="h-4 w-4" />}
+                Varrer meu OneDrive
+              </button>
+              <button onClick={() => connectPersonal()}
+                className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reconectar
+              </button>
+            </div>
+          )}
+        </div>
+      </IntegrationCard>
 
       {/* MS365 */}
       <IntegrationCard
