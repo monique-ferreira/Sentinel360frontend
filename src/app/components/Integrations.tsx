@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, forwardRef } from "react";
 import {
   RefreshCw, CheckCircle2, AlertCircle,
   ChevronDown, ChevronUp, Shield, Users, Building2, Zap,
@@ -9,6 +9,7 @@ import { useAuth } from "../AuthContext";
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 type SaveStatus = "idle" | "saving" | "ok" | "error";
 type CloudPhase = "idle" | "scanning" | "done" | "error";
+type Provider = "ms365" | "azure" | "personal";
 
 function Field({ label, value, onChange, type = "text", placeholder, disabled }: {
   label: string; value: string; onChange: (v: string) => void;
@@ -26,29 +27,87 @@ function Field({ label, value, onChange, type = "text", placeholder, disabled }:
   );
 }
 
-function IntegrationCard({
-  title, subtitle, icon, color, open, onToggle, children,
-}: {
+const IntegrationCard = forwardRef<HTMLDivElement, {
   title: string; subtitle: string; icon: React.ReactNode; color: string;
   open: boolean; onToggle: () => void; children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <button onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors text-left">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: color + "18", border: `1px solid ${color}35` }}>
-            <div style={{ color }}>{icon}</div>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">{title}</p>
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
-          </div>
+}>(({ title, subtitle, icon, color, open, onToggle, children }, ref) => (
+  <div ref={ref} className="rounded-xl border border-border bg-card overflow-hidden scroll-mt-4">
+    <button onClick={onToggle}
+      className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors text-left">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: color + "18", border: `1px solid ${color}35` }}>
+          <div style={{ color }}>{icon}</div>
         </div>
-        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-      </button>
-      {open && <div className="px-5 pb-5 border-t border-border pt-4">{children}</div>}
+        <div>
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
+        </div>
+      </div>
+      {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+    </button>
+    {open && <div className="px-5 pb-5 border-t border-border pt-4">{children}</div>}
+  </div>
+));
+
+// Inline scan status shown inside the card that triggered the scan
+function ScanStatus({
+  phase, progress, processedFiles, etaSeconds, cloudMsg, files, filterDateFrom, onFilterDateChange,
+}: {
+  phase: CloudPhase; progress: number; processedFiles: number; etaSeconds: number;
+  cloudMsg: string; files: any[]; filterDateFrom: string; onFilterDateChange: (v: string) => void;
+}) {
+  if (phase === "idle") return null;
+
+  return (
+    <div className="mt-4 border-t border-border pt-4 space-y-3">
+      {phase === "error" && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4 shrink-0" />{cloudMsg}
+        </div>
+      )}
+
+      {(phase === "scanning" || phase === "done") && (
+        <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className={`flex items-center gap-1.5 font-medium ${phase === "scanning" ? "text-[#58a6ff]" : "text-[#3fb950]"}`}>
+              {phase === "scanning"
+                ? <><RefreshCw className="h-3 w-3 animate-spin" />Varrendo arquivos...</>
+                : <><CheckCircle2 className="h-3 w-3" />Varredura concluída!</>}
+            </span>
+            <span className="text-muted-foreground tabular-nums font-medium">{Math.round(progress)}%</span>
+          </div>
+          <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+            <div
+              className={`h-1.5 rounded-full transition-all duration-500 ${phase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
+              style={{ width: `${Math.max(3, Math.min(progress, 100))}%` }}
+            />
+          </div>
+          {phase === "scanning" && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <FileSearch className="h-3 w-3" />
+                {processedFiles > 0 ? `${processedFiles} arquivo(s) analisado(s)` : "Iniciando varredura..."}
+              </span>
+              {etaSeconds > 0 && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  ~{etaSeconds < 60 ? `${etaSeconds}s` : `${Math.ceil(etaSeconds / 60)}min`} restante(s)
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {phase === "done" && (
+        <>
+          {files.length > 0
+            ? <CloudFileTable files={files} filterDateFrom={filterDateFrom} onFilterDateChange={onFilterDateChange} />
+            : <p className="text-xs text-muted-foreground">Nenhum arquivo sensível ou inativo encontrado.</p>
+          }
+        </>
+      )}
     </div>
   );
 }
@@ -58,56 +117,62 @@ export function Integrations() {
 
   const [inactivityDays, setInactivityDays] = useState(180);
   const [filterDateFrom, setFilterDateFrom] = useState("");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const scanSectionRef = useRef<HTMLDivElement>(null);
+
+  // Card refs for scroll-into-view
+  const personalCardRef = useRef<HTMLDivElement>(null);
+  const ms365CardRef    = useRef<HTMLDivElement>(null);
+  const azureCardRef    = useRef<HTMLDivElement>(null);
 
   // Conta pessoal Microsoft
-  const [personalOpen, setPersonalOpen] = useState(false);
+  const [personalOpen, setPersonalOpen]           = useState(false);
   const [personalConnected, setPersonalConnected] = useState(false);
-  const [personalEmail, setPersonalEmail] = useState("");
+  const [personalEmail, setPersonalEmail]         = useState("");
   const [personalConnecting, setPersonalConnecting] = useState(false);
 
   // MS365
-  const [ms365Open, setMs365Open] = useState(false);
-  const [ms365Tenant, setMs365Tenant] = useState("");
-  const [ms365Client, setMs365Client] = useState("");
-  const [ms365Secret, setMs365Secret] = useState("");
-  const [ms365Status, setMs365Status] = useState<SaveStatus>("idle");
-  const [ms365Msg, setMs365Msg] = useState("");
-  const [ms365Users, setMs365Users] = useState<any[]>([]);
-  const [loadingMs365, setLoadingMs365] = useState(false);
+  const [ms365Open, setMs365Open]         = useState(false);
+  const [ms365Tenant, setMs365Tenant]     = useState("");
+  const [ms365Client, setMs365Client]     = useState("");
+  const [ms365Secret, setMs365Secret]     = useState("");
+  const [ms365Status, setMs365Status]     = useState<SaveStatus>("idle");
+  const [ms365Msg, setMs365Msg]           = useState("");
+  const [ms365Users, setMs365Users]       = useState<any[]>([]);
+  const [loadingMs365, setLoadingMs365]   = useState(false);
 
   // Azure AD
-  const [azureOpen, setAzureOpen] = useState(false);
-  const [azureTenant, setAzureTenant] = useState("");
-  const [azureClient, setAzureClient] = useState("");
-  const [azureSecret, setAzureSecret] = useState("");
-  const [azureStatus, setAzureStatus] = useState<SaveStatus>("idle");
-  const [azureMsg, setAzureMsg] = useState("");
-  const [azureUsers, setAzureUsers] = useState<any[]>([]);
-  const [loadingAzure, setLoadingAzure] = useState(false);
+  const [azureOpen, setAzureOpen]         = useState(false);
+  const [azureTenant, setAzureTenant]     = useState("");
+  const [azureClient, setAzureClient]     = useState("");
+  const [azureSecret, setAzureSecret]     = useState("");
+  const [azureStatus, setAzureStatus]     = useState<SaveStatus>("idle");
+  const [azureMsg, setAzureMsg]           = useState("");
+  const [azureUsers, setAzureUsers]       = useState<any[]>([]);
+  const [loadingAzure, setLoadingAzure]   = useState(false);
 
-  // Cloud scan
-  const [cloudPhase, setCloudPhase] = useState<CloudPhase>("idle");
-  const [cloudProvider, setCloudProvider] = useState<"ms365" | "azure" | "personal">("ms365");
-  const [cloudProgress, setCloudProgress] = useState(0);
-  const [cloudMsg, setCloudMsg] = useState("");
-  const [cloudFiles, setCloudFiles] = useState<any[]>([]);
+  // Cloud scan — single active scan at a time
+  const [cloudPhase, setCloudPhase]           = useState<CloudPhase>("idle");
+  const [cloudProvider, setCloudProvider]     = useState<Provider>("personal");
+  const [cloudProgress, setCloudProgress]     = useState(0);
+  const [cloudMsg, setCloudMsg]               = useState("");
+  const [cloudFiles, setCloudFiles]           = useState<any[]>([]);
   const [loadingCloudFiles, setLoadingCloudFiles] = useState(false);
-  const [processedFiles, setProcessedFiles] = useState(0);
-  const [etaSeconds, setEtaSeconds] = useState(-1);
+  const [processedFiles, setProcessedFiles]   = useState(0);
+  const [etaSeconds, setEtaSeconds]           = useState(-1);
   const cloudPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [biLoading, setBiLoading] = useState(false);
 
   const h = { Authorization: `Bearer ${token}` };
 
-  const stopPolling = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+  const stopCloudPoll = () => {
+    if (cloudPollRef.current) { clearInterval(cloudPollRef.current); cloudPollRef.current = null; }
+  };
 
-  // Detecta retorno do OAuth (code na URL) e troca pelo token no backend
+  // Detect OAuth callback code in URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const code  = params.get("code");
-    const state = params.get("state");
+    const code   = params.get("code");
+    const state  = params.get("state");
 
     if (code) {
       window.history.replaceState({}, "", window.location.pathname);
@@ -131,18 +196,22 @@ export function Integrations() {
       return;
     }
 
-    // Restaura do localStorage
     const saved = localStorage.getItem("ms_personal_email");
     if (saved) { setPersonalConnected(true); setPersonalEmail(saved); }
 
-    // Confirma com o backend
     fetch(`${API_URL}/auth/microsoft/status`, { headers: h })
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d?.connected) { setPersonalConnected(true); setPersonalEmail(d.ms_email); localStorage.setItem("ms_personal_email", d.ms_email); }
+        if (d?.connected) {
+          setPersonalConnected(true);
+          setPersonalEmail(d.ms_email);
+          localStorage.setItem("ms_personal_email", d.ms_email);
+        }
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => () => stopCloudPoll(), []);
 
   const connectPersonal = async () => {
     setPersonalConnecting(true);
@@ -185,7 +254,7 @@ export function Integrations() {
   const auditMs365 = async () => {
     setLoadingMs365(true); setMs365Msg("");
     try {
-      const res = await fetch(`${API_URL}/integrations/office365/audit?inactive_days=90`, { headers: h });
+      const res = await fetch(`${API_URL}/integrations/office365/audit?inactive_days=${inactivityDays}`, { headers: h });
       if (!res.ok) { const d = await res.json(); setMs365Msg(d.detail ?? `Erro ${res.status}`); return; }
       const data = await res.json();
       setMs365Users(data.inactive_users ?? []);
@@ -197,7 +266,7 @@ export function Integrations() {
   const auditAzure = async () => {
     setLoadingAzure(true); setAzureMsg("");
     try {
-      const res = await fetch(`${API_URL}/integrations/azure/audit?inactive_days=90`, { headers: h });
+      const res = await fetch(`${API_URL}/integrations/azure/audit?inactive_days=${inactivityDays}`, { headers: h });
       if (!res.ok) { const d = await res.json(); setAzureMsg(d.detail ?? `Erro ${res.status}`); return; }
       const data = await res.json();
       setAzureUsers(data.inactive_users ?? []);
@@ -206,9 +275,7 @@ export function Integrations() {
     finally { setLoadingAzure(false); }
   };
 
-  const stopCloudPoll = () => { if (cloudPollRef.current) { clearInterval(cloudPollRef.current); cloudPollRef.current = null; } };
-
-  const startCloudScan = async (provider: "ms365" | "azure" | "personal") => {
+  const startCloudScan = async (provider: Provider) => {
     setCloudProvider(provider);
     setCloudPhase("scanning");
     setCloudProgress(0);
@@ -216,16 +283,24 @@ export function Integrations() {
     setCloudFiles([]);
     setProcessedFiles(0);
     setEtaSeconds(-1);
+    setFilterDateFrom("");
 
-    // Scroll to progress section smoothly
-    setTimeout(() => scanSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    // Open and scroll to the card that triggered the scan
+    if (provider === "personal") { setPersonalOpen(true); setTimeout(() => personalCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "ms365")    { setMs365Open(true);    setTimeout(() => ms365CardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "azure")    { setAzureOpen(true);    setTimeout(() => azureCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
 
     const endpoint = provider === "ms365" ? "office365" : provider === "azure" ? "azure" : "personal";
     try {
       const res = await fetch(`${API_URL}/integrations/${endpoint}/scan-files?days=${inactivityDays}`, {
         method: "POST", headers: h,
       });
-      if (!res.ok) { const d = await res.json(); setCloudPhase("error"); setCloudMsg(d.detail ?? `Erro ${res.status}`); return; }
+      if (!res.ok) {
+        const d = await res.json();
+        setCloudPhase("error");
+        setCloudMsg(d.detail ?? `Erro ${res.status}`);
+        return;
+      }
       stopCloudPoll();
       cloudPollRef.current = setInterval(async () => {
         try {
@@ -238,25 +313,16 @@ export function Integrations() {
           if (d.error) { setCloudPhase("error"); setCloudMsg(d.error); stopCloudPoll(); return; }
           if (!d.is_scanning) {
             setCloudPhase("done");
-            setCloudMsg("Varredura cloud concluída!");
             stopCloudPoll();
-            fetchCloudFiles(provider);
+            // Load results
+            setLoadingCloudFiles(true);
+            const r = await fetch(`${API_URL}/integrations/${endpoint}/file-results`, { headers: h });
+            if (r.ok) { const rd = await r.json(); setCloudFiles(rd.items ?? []); }
+            setLoadingCloudFiles(false);
           }
         } catch { /* ignore */ }
       }, 2000);
     } catch { setCloudPhase("error"); setCloudMsg("Servidor indisponível."); }
-  };
-
-  const fetchCloudFiles = async (provider: "ms365" | "azure" | "personal") => {
-    setLoadingCloudFiles(true);
-    try {
-      const endpoint = provider === "ms365" ? "office365" : provider === "azure" ? "azure" : "personal";
-      const res = await fetch(`${API_URL}/integrations/${endpoint}/file-results`, { headers: h });
-      if (!res.ok) return;
-      const d = await res.json();
-      setCloudFiles(d.items ?? []);
-    } catch { /* ignore */ }
-    finally { setLoadingCloudFiles(false); }
   };
 
   const downloadBiReport = async () => {
@@ -268,7 +334,7 @@ export function Integrations() {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href     = url;
-      a.download = `sentinel360_bi_${Date.now()}.html`;
+      a.download = `sentinel360_bi_${new Date().toISOString().slice(0,10)}.html`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -277,12 +343,17 @@ export function Integrations() {
     finally { setBiLoading(false); }
   };
 
-  useEffect(() => () => stopCloudPoll(), []);
-
   const btnCls = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50";
+
+  const scanStatusProps = {
+    phase: cloudPhase, progress: cloudProgress, processedFiles,
+    etaSeconds, cloudMsg, files: cloudFiles,
+    filterDateFrom, onFilterDateChange: setFilterDateFrom,
+  };
 
   return (
     <div className="space-y-5">
+      {/* Header with inactivity threshold */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
@@ -293,13 +364,13 @@ export function Integrations() {
             Gerencie o motor de varredura e as integrações do Sentinel 360.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Clock className="h-4 w-4 text-muted-foreground" />
+        <div className="flex items-center gap-2 shrink-0 bg-card border border-border rounded-lg px-3 py-2">
+          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">Inativo após</span>
           <input
             type="number" min={1} max={3650} value={inactivityDays}
             onChange={e => setInactivityDays(Math.max(1, Number(e.target.value)))}
-            className="w-16 h-8 px-2 rounded-lg border border-border bg-secondary text-sm text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-14 h-7 px-2 rounded border border-border bg-secondary text-sm text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <span className="text-xs text-muted-foreground">dias sem acesso</span>
         </div>
@@ -307,12 +378,13 @@ export function Integrations() {
 
       {/* Conta pessoal Microsoft */}
       <IntegrationCard
+        ref={personalCardRef}
         title="Conta Microsoft Pessoal"
         subtitle="OneDrive, arquivos e documentos pessoais"
         icon={<UserCircle className="w-4 h-4" />}
         color="#3fb950"
         open={personalOpen}
-        onToggle={() => setPersonalOpen(!personalOpen)}
+        onToggle={() => setPersonalOpen(v => !v)}
       >
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-[#3fb950]/8 border border-[#3fb950]/20 text-xs text-[#3fb950] space-y-1">
@@ -331,40 +403,43 @@ export function Integrations() {
           ) : (
             <button onClick={connectPersonal} disabled={personalConnecting}
               className={`${btnCls} bg-[#3fb950]/10 border border-[#3fb950]/30 text-[#3fb950] hover:bg-[#3fb950]/20 w-full justify-center`}>
-              {personalConnecting
-                ? <RefreshCw className="h-4 w-4 animate-spin" />
-                : <LogIn className="h-4 w-4" />}
+              {personalConnecting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
               Entrar com conta Microsoft
             </button>
           )}
 
           {personalConnected && (
             <div className="flex gap-2 flex-wrap">
-              <button onClick={() => startCloudScan("personal" as any)} disabled={cloudPhase === "scanning"}
+              <button
+                onClick={() => startCloudScan("personal")}
+                disabled={cloudPhase === "scanning"}
                 className={`${btnCls} bg-[#3fb950]/10 border border-[#3fb950]/30 text-[#3fb950] hover:bg-[#3fb950]/20`}>
                 {cloudPhase === "scanning" && cloudProvider === "personal"
                   ? <RefreshCw className="h-4 w-4 animate-spin" />
                   : <Cloud className="h-4 w-4" />}
                 Varrer meu OneDrive
               </button>
-              <button onClick={() => connectPersonal()}
+              <button onClick={connectPersonal}
                 className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
-                <RefreshCw className="h-3.5 w-3.5" />
-                Reconectar
+                <RefreshCw className="h-3.5 w-3.5" />Reconectar
               </button>
             </div>
           )}
+
+          {/* Scan progress inline — only shows when this card's provider is active */}
+          {cloudProvider === "personal" && <ScanStatus {...scanStatusProps} />}
         </div>
       </IntegrationCard>
 
       {/* MS365 */}
       <IntegrationCard
+        ref={ms365CardRef}
         title="Microsoft 365"
         subtitle="Exchange, SharePoint, Teams"
         icon={<Building2 className="w-4 h-4" />}
         color="#58a6ff"
         open={ms365Open}
-        onToggle={() => setMs365Open(!ms365Open)}
+        onToggle={() => setMs365Open(v => !v)}
       >
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-[#58a6ff]/8 border border-[#58a6ff]/20 text-xs text-[#58a6ff] space-y-1">
@@ -406,17 +481,20 @@ export function Integrations() {
             )}
           </div>
           {ms365Users.length > 0 && <UserList users={ms365Users} label="Microsoft 365" />}
+
+          {cloudProvider === "ms365" && <ScanStatus {...scanStatusProps} />}
         </div>
       </IntegrationCard>
 
       {/* Azure AD */}
       <IntegrationCard
+        ref={azureCardRef}
         title="Azure Active Directory"
         subtitle="Identidade, Usuários, Grupos"
         icon={<Users className="w-4 h-4" />}
         color="#bc8cff"
         open={azureOpen}
-        onToggle={() => setAzureOpen(!azureOpen)}
+        onToggle={() => setAzureOpen(v => !v)}
       >
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-[#bc8cff]/8 border border-[#bc8cff]/20 text-xs text-[#bc8cff] space-y-1">
@@ -446,7 +524,7 @@ export function Integrations() {
                 <button onClick={auditAzure} disabled={loadingAzure}
                   className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
                   {loadingAzure ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
-                  Auditar contas inativas (90d)
+                  Auditar contas inativas
                 </button>
                 <button onClick={() => startCloudScan("azure")} disabled={cloudPhase === "scanning"}
                   className={`${btnCls} bg-[#bc8cff]/10 border border-[#bc8cff]/30 text-[#bc8cff] hover:bg-[#bc8cff]/20`}>
@@ -459,91 +537,10 @@ export function Integrations() {
             )}
           </div>
           {azureUsers.length > 0 && <UserList users={azureUsers} label="Azure AD" />}
+
+          {cloudProvider === "azure" && <ScanStatus {...scanStatusProps} />}
         </div>
       </IntegrationCard>
-
-      {/* Cloud scan section */}
-      {(cloudPhase !== "idle") && (
-        <div ref={scanSectionRef} className="rounded-xl border border-border bg-card overflow-hidden scroll-mt-4">
-          <div className="px-5 py-4 border-b border-border flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#58a6ff]/10 border border-[#58a6ff]/20 flex items-center justify-center">
-              <Cloud className="w-4 h-4 text-[#58a6ff]" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                Varredura Cloud — {
-                  cloudProvider === "ms365" ? "SharePoint + OneDrive" :
-                  cloudProvider === "azure" ? "OneDrive (Azure AD)" : "OneDrive Pessoal"
-                }
-              </p>
-              <p className="text-xs text-muted-foreground">Limiar de inatividade: {inactivityDays} dias</p>
-            </div>
-            {cloudPhase === "done" && (
-              <span className="ml-auto flex items-center gap-1.5 text-xs text-[#3fb950] font-medium">
-                <CheckCircle2 className="h-3.5 w-3.5" />Concluído
-              </span>
-            )}
-          </div>
-          <div className="p-5 space-y-4">
-            {cloudPhase === "error" && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />{cloudMsg}
-              </div>
-            )}
-            {(cloudPhase === "scanning" || cloudPhase === "done") && (
-              <div className="p-4 rounded-lg border border-border bg-secondary/30 space-y-2.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className={`flex items-center gap-1.5 font-medium ${cloudPhase === "scanning" ? "text-[#58a6ff]" : "text-[#3fb950]"}`}>
-                    {cloudPhase === "scanning"
-                      ? <><RefreshCw className="h-3 w-3 animate-spin" />Varrendo arquivos cloud...</>
-                      : <><CheckCircle2 className="h-3 w-3" />{cloudMsg}</>}
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">{Math.round(cloudProgress)}%</span>
-                </div>
-                <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500 ${cloudPhase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
-                    style={{ width: `${Math.max(2, Math.min(cloudProgress, 100))}%` }}
-                  />
-                </div>
-                {cloudPhase === "scanning" && (
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <FileSearch className="h-3 w-3" />
-                      {processedFiles > 0 ? `${processedFiles} arquivo(s) analisado(s)` : "Iniciando varredura..."}
-                    </span>
-                    {etaSeconds > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        ~{etaSeconds < 60 ? `${etaSeconds}s` : `${Math.ceil(etaSeconds / 60)}min`} restante(s)
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            {cloudPhase === "done" && (
-              <>
-                {loadingCloudFiles && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <RefreshCw className="h-3 w-3 animate-spin" />Carregando resultados...
-                  </div>
-                )}
-                {cloudFiles.length > 0 && (
-                  <CloudFileTable
-                    files={cloudFiles}
-                    filterDateFrom={filterDateFrom}
-                    onFilterDateChange={setFilterDateFrom}
-                  />
-                )}
-                {!loadingCloudFiles && cloudFiles.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Nenhum arquivo sensível ou inativo encontrado.</p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* BI Report */}
       <div className="rounded-xl border border-border bg-card p-5 flex items-center justify-between gap-4">
@@ -553,13 +550,13 @@ export function Integrations() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Relatório BI Consolidado</p>
-            <p className="text-xs text-muted-foreground">Gráficos interativos de risco, inatividade e histórico de scans</p>
+            <p className="text-xs text-muted-foreground">Gráficos interativos de risco, inatividade e histórico de scans — baixado como arquivo HTML</p>
           </div>
         </div>
         <button onClick={downloadBiReport} disabled={biLoading}
           className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20 shrink-0`}>
           {biLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          Gerar Relatório BI
+          Baixar Relatório BI
         </button>
       </div>
     </div>
@@ -584,14 +581,14 @@ function CloudFileTable({ files, filterDateFrom, onFilterDateChange }: {
           {filtered.length} item(ns){filterDateFrom ? ` (filtrado de ${files.length})` : ""} — {risky.length} com risco
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Desde</span>
+          <span className="text-xs text-muted-foreground">Filtrar por data:</span>
           <input
             type="date" value={filterDateFrom} onChange={e => onFilterDateChange(e.target.value)}
             className="h-7 px-2 rounded border border-border bg-secondary text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
           />
           {filterDateFrom && (
             <button onClick={() => onFilterDateChange("")}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors">✕</button>
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1">✕</button>
           )}
         </div>
       </div>
