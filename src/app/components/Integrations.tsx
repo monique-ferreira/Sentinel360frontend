@@ -52,10 +52,12 @@ const IntegrationCard = forwardRef<HTMLDivElement, {
 
 // Inline scan status shown inside the card that triggered the scan
 function ScanStatus({
-  phase, progress, processedFiles, etaSeconds, cloudMsg, files, filterDateFrom, onFilterDateChange,
+  phase, progress, processedFiles, etaSeconds, cloudMsg, files,
+  filterDateFrom, onFilterDateChange, color,
 }: {
   phase: CloudPhase; progress: number; processedFiles: number; etaSeconds: number;
   cloudMsg: string; files: any[]; filterDateFrom: string; onFilterDateChange: (v: string) => void;
+  color: string;
 }) {
   if (phase === "idle") return null;
 
@@ -70,7 +72,7 @@ function ScanStatus({
       {(phase === "scanning" || phase === "done") && (
         <div className="p-3 rounded-lg border border-border bg-secondary/30 space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <span className={`flex items-center gap-1.5 font-medium ${phase === "scanning" ? "text-[#58a6ff]" : "text-[#3fb950]"}`}>
+            <span className="flex items-center gap-1.5 font-medium" style={{ color }}>
               {phase === "scanning"
                 ? <><RefreshCw className="h-3 w-3 animate-spin" />Varrendo arquivos...</>
                 : <><CheckCircle2 className="h-3 w-3" />Varredura concluída!</>}
@@ -79,8 +81,11 @@ function ScanStatus({
           </div>
           <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
             <div
-              className={`h-1.5 rounded-full transition-all duration-500 ${phase === "done" ? "bg-[#3fb950]" : "bg-[#58a6ff]"}`}
-              style={{ width: `${Math.max(3, Math.min(progress, 100))}%` }}
+              className="h-1.5 rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.max(3, Math.min(progress, 100))}%`,
+                background: color,
+              }}
             />
           </div>
           {phase === "scanning" && (
@@ -104,7 +109,21 @@ function ScanStatus({
         <>
           {files.length > 0
             ? <CloudFileTable files={files} filterDateFrom={filterDateFrom} onFilterDateChange={onFilterDateChange} />
-            : <p className="text-xs text-muted-foreground">Nenhum arquivo sensível ou inativo encontrado.</p>
+            : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Filtrar por data de scan:</span>
+                  <input
+                    type="date" value={filterDateFrom} onChange={e => onFilterDateChange(e.target.value)}
+                    className="h-7 px-2 rounded border border-border bg-secondary text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
+                  />
+                  {filterDateFrom && (
+                    <button onClick={() => onFilterDateChange("")} className="text-xs text-muted-foreground hover:text-foreground px-1">✕</button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Nenhum arquivo sensível ou inativo encontrado.</p>
+              </div>
+            )
           }
         </>
       )}
@@ -334,7 +353,7 @@ export function Integrations() {
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href     = url;
-      a.download = `sentinel360_bi_${new Date().toISOString().slice(0,10)}.html`;
+      a.download = `sentinel360_bi_${new Date().toISOString().slice(0,10)}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -345,7 +364,7 @@ export function Integrations() {
 
   const btnCls = "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50";
 
-  const scanStatusProps = {
+  const scanStatusBase = {
     phase: cloudPhase, progress: cloudProgress, processedFiles,
     etaSeconds, cloudMsg, files: cloudFiles,
     filterDateFrom, onFilterDateChange: setFilterDateFrom,
@@ -368,8 +387,15 @@ export function Integrations() {
           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">Inativo após</span>
           <input
-            type="number" min={1} max={3650} value={inactivityDays}
-            onChange={e => setInactivityDays(Math.max(1, Number(e.target.value)))}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={inactivityDays}
+            onChange={e => {
+              const v = parseInt(e.target.value.replace(/\D/g, ""), 10);
+              if (!isNaN(v) && v >= 1) setInactivityDays(v);
+              else if (e.target.value === "") setInactivityDays(1);
+            }}
             className="w-14 h-7 px-2 rounded border border-border bg-secondary text-sm text-foreground text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
           <span className="text-xs text-muted-foreground">dias sem acesso</span>
@@ -426,8 +452,7 @@ export function Integrations() {
             </div>
           )}
 
-          {/* Scan progress inline — only shows when this card's provider is active */}
-          {cloudProvider === "personal" && <ScanStatus {...scanStatusProps} />}
+          {cloudProvider === "personal" && <ScanStatus {...scanStatusBase} color="#3fb950" />}
         </div>
       </IntegrationCard>
 
@@ -482,7 +507,7 @@ export function Integrations() {
           </div>
           {ms365Users.length > 0 && <UserList users={ms365Users} label="Microsoft 365" />}
 
-          {cloudProvider === "ms365" && <ScanStatus {...scanStatusProps} />}
+          {cloudProvider === "ms365" && <ScanStatus {...scanStatusBase} color="#58a6ff" />}
         </div>
       </IntegrationCard>
 
@@ -538,7 +563,7 @@ export function Integrations() {
           </div>
           {azureUsers.length > 0 && <UserList users={azureUsers} label="Azure AD" />}
 
-          {cloudProvider === "azure" && <ScanStatus {...scanStatusProps} />}
+          {cloudProvider === "azure" && <ScanStatus {...scanStatusBase} color="#bc8cff" />}
         </div>
       </IntegrationCard>
 
@@ -550,13 +575,13 @@ export function Integrations() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Relatório BI Consolidado</p>
-            <p className="text-xs text-muted-foreground">Gráficos interativos de risco, inatividade e histórico de scans — baixado como arquivo HTML</p>
+            <p className="text-xs text-muted-foreground">Excel com abas de dados, gráficos e histórico — abrível no Power BI Desktop via "Obter Dados &gt; Excel"</p>
           </div>
         </div>
         <button onClick={downloadBiReport} disabled={biLoading}
           className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20 shrink-0`}>
           {biLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          Baixar Relatório BI
+          Baixar BI (.xlsx)
         </button>
       </div>
     </div>
