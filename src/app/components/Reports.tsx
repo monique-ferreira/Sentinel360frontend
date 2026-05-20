@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, WifiOff, FileBarChart2, Search, Trash2, CheckCircle2 } from "lucide-react";
+import { RefreshCw, WifiOff, FileBarChart2, Search, Trash2, CheckCircle2, Calendar } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
@@ -25,6 +25,8 @@ export function Reports() {
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("todos");
   const [riskFilter, setRiskFilter] = useState<"todos" | "com_risco" | "sem_risco">("todos");
   const [threshold, setThreshold] = useState(180);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -63,6 +65,14 @@ export function Reports() {
     if (statusFilter === "inativo") result = result.filter(i =>  checkInactive(i, threshold));
     if (riskFilter === "com_risco") result = result.filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; });
     if (riskFilter === "sem_risco") result = result.filter(i => { const r = i.riscos || i.Riscos || ""; return !r || r === "NENHUM" || r === "Nenhum"; });
+    if (dateFrom) result = result.filter(i => {
+      const d = (i.last_scan || i.Data || "").slice(0, 10);
+      return d >= dateFrom;
+    });
+    if (dateTo) result = result.filter(i => {
+      const d = (i.last_scan || i.Data || "").slice(0, 10);
+      return d <= dateTo;
+    });
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(i =>
@@ -72,7 +82,7 @@ export function Reports() {
       );
     }
     setFiltered(result);
-  }, [search, statusFilter, riskFilter, items, threshold]);
+  }, [search, statusFilter, riskFilter, items, threshold, dateFrom, dateTo]);
 
   const handleDelete = async (item: any) => {
     const path = item.caminho || item.Caminho || item.path;
@@ -88,8 +98,8 @@ export function Reports() {
     finally { setDeleting(null); }
   };
 
-  const clearFilters = () => { setSearch(""); setStatusFilter("todos"); setRiskFilter("todos"); };
-  const hasFilters = search || statusFilter !== "todos" || riskFilter !== "todos";
+  const clearFilters = () => { setSearch(""); setStatusFilter("todos"); setRiskFilter("todos"); setDateFrom(""); setDateTo(""); };
+  const hasFilters = search || statusFilter !== "todos" || riskFilter !== "todos" || dateFrom || dateTo;
 
   const chipBtn = (active: boolean) =>
     `px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
@@ -144,6 +154,31 @@ export function Reports() {
             <button onClick={() => setRiskFilter("todos")}     className={chipBtn(riskFilter === "todos")}>Todos</button>
             <button onClick={() => setRiskFilter("com_risco")} className={chipBtn(riskFilter === "com_risco")}>Com risco</button>
             <button onClick={() => setRiskFilter("sem_risco")} className={chipBtn(riskFilter === "sem_risco")}>Sem risco</button>
+          </div>
+
+          {/* Date range filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground">Data do scan:</span>
+            <div className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border bg-card">
+              <input
+                type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                className="h-full bg-transparent text-xs text-foreground focus:outline-none"
+                title="De"
+              />
+            </div>
+            <span className="text-xs text-muted-foreground">até</span>
+            <div className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border bg-card">
+              <input
+                type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                className="h-full bg-transparent text-xs text-foreground focus:outline-none"
+                title="Até"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className="text-xs text-muted-foreground hover:text-foreground px-1">✕ limpar datas</button>
+            )}
           </div>
         </div>
       )}
