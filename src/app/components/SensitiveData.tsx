@@ -7,7 +7,7 @@ function OrigemTag({ origem }: { origem?: string }) {
   if (!origem) return <span className="text-xs text-muted-foreground">—</span>;
   const isGdrive   = origem.toLowerCase().includes("google");
   const isOneDrive = origem.toLowerCase().includes("onedrive") || origem.toLowerCase().includes("sharepoint");
-  const color = isGdrive ? "#ea4335" : isOneDrive ? "#58a6ff" : "#7d8590";
+  const color = isGdrive ? "#d29922" : isOneDrive ? "#58a6ff" : "#7d8590";
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
       style={{ color, borderColor: color + "40", background: color + "15" }}>
