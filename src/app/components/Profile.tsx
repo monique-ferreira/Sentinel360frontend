@@ -21,6 +21,8 @@ export function Profile() {
   const [email, setEmail] = useState("");
   const [inactivityDays, setInactivityDays] = useState(180);
   const [autoScanInterval, setAutoScanInterval] = useState("never");
+  const [autoScanHour, setAutoScanHour] = useState(6);
+  const [autoScanDay, setAutoScanDay] = useState(1);
   const [lastAutoScan, setLastAutoScan] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveMsg, setSaveMsg] = useState("");
@@ -38,6 +40,8 @@ export function Profile() {
       setEmail(data.email ?? "");
       setInactivityDays(data.inactivity_days ?? 180);
       setAutoScanInterval(data.auto_scan_interval ?? "never");
+      setAutoScanHour(data.auto_scan_hour ?? 6);
+      setAutoScanDay(data.auto_scan_day ?? 1);
       setLastAutoScan(data.last_auto_scan ?? null);
     } catch (e: any) {
       setError(e.message ?? "Erro ao carregar perfil.");
@@ -58,6 +62,8 @@ export function Profile() {
           email:               email.trim() || undefined,
           inactivity_days:     inactivityDays,
           auto_scan_interval:  autoScanInterval,
+          auto_scan_hour:      autoScanHour,
+          auto_scan_day:       autoScanDay,
         }),
       });
       const data = await res.json();
@@ -224,10 +230,12 @@ export function Profile() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+        <div className="space-y-3">
+          <label className="block text-xs font-medium text-muted-foreground">
             <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" /> Varredura automática</span>
           </label>
+
+          {/* Frequency */}
           <select
             className="h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-colors disabled:opacity-50"
             value={autoScanInterval}
@@ -235,17 +243,72 @@ export function Profile() {
             disabled={saveStatus === "saving"}
           >
             <option value="never">Desativada</option>
-            <option value="daily">Diária (a cada 24h)</option>
-            <option value="weekly">Semanal (a cada 7 dias)</option>
-            <option value="monthly">Mensal (a cada 30 dias)</option>
+            <option value="daily">Diária</option>
+            <option value="weekly">Semanal</option>
+            <option value="monthly">Mensal</option>
           </select>
+
+          {/* Day + hour selectors */}
+          {autoScanInterval !== "never" && (
+            <div className="flex flex-wrap gap-3 items-end">
+              {/* Day of week (weekly only) */}
+              {autoScanInterval === "weekly" && (
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Dia da semana</label>
+                  <select
+                    className="h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+                    value={autoScanDay}
+                    onChange={e => setAutoScanDay(Number(e.target.value))}
+                    disabled={saveStatus === "saving"}
+                  >
+                    {["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"].map((d, i) => (
+                      <option key={i} value={i}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Day of month (monthly only) */}
+              {autoScanInterval === "monthly" && (
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Dia do mês</label>
+                  <select
+                    className="h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+                    value={autoScanDay}
+                    onChange={e => setAutoScanDay(Number(e.target.value))}
+                    disabled={saveStatus === "saving"}
+                  >
+                    {Array.from({length: 28}, (_, i) => i + 1).map(d => (
+                      <option key={d} value={d}>Dia {d}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Hour */}
+              <div>
+                <label className="block text-xs text-muted-foreground mb-1">Horário</label>
+                <select
+                  className="h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
+                  value={autoScanHour}
+                  onChange={e => setAutoScanHour(Number(e.target.value))}
+                  disabled={saveStatus === "saving"}
+                >
+                  {Array.from({length: 24}, (_, i) => i).map(h => (
+                    <option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {lastAutoScan && autoScanInterval !== "never" && (
-            <p className="text-xs text-muted-foreground mt-1.5">
+            <p className="text-xs text-muted-foreground">
               Último scan automático: {new Date(lastAutoScan).toLocaleString("pt-BR")}
             </p>
           )}
           {autoScanInterval !== "never" && (
-            <p className="text-xs text-primary/80 mt-1">
+            <p className="text-xs text-primary/80">
               O Sentinel360 vai varrer seus arquivos automaticamente sem precisar de ação manual.
             </p>
           )}
