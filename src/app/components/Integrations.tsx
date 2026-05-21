@@ -9,7 +9,7 @@ import { useAuth } from "../AuthContext";
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 type SaveStatus = "idle" | "saving" | "ok" | "error";
 type CloudPhase = "idle" | "scanning" | "done" | "error";
-type Provider = "ms365" | "azure" | "personal";
+type Provider = "ms365" | "azure" | "personal" | "google_personal" | "google_workspace";
 
 function Field({ label, value, onChange, type = "text", placeholder, disabled }: {
   label: string; value: string; onChange: (v: string) => void;
@@ -138,9 +138,11 @@ export function Integrations() {
   const [filterDateFrom, setFilterDateFrom] = useState("");
 
   // Card refs for scroll-into-view
-  const personalCardRef = useRef<HTMLDivElement>(null);
-  const ms365CardRef    = useRef<HTMLDivElement>(null);
-  const azureCardRef    = useRef<HTMLDivElement>(null);
+  const personalCardRef      = useRef<HTMLDivElement>(null);
+  const ms365CardRef         = useRef<HTMLDivElement>(null);
+  const azureCardRef         = useRef<HTMLDivElement>(null);
+  const gdriveCardRef        = useRef<HTMLDivElement>(null);
+  const gworkspaceCardRef    = useRef<HTMLDivElement>(null);
 
   // Conta pessoal Microsoft
   const [personalOpen, setPersonalOpen]           = useState(false);
@@ -178,6 +180,20 @@ export function Integrations() {
   const [processedFiles, setProcessedFiles]   = useState(0);
   const [etaSeconds, setEtaSeconds]           = useState(-1);
   const cloudPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Google Drive pessoal
+  const [gdriveOpen, setGdriveOpen]           = useState(false);
+  const [gdriveConnected, setGdriveConnected] = useState(false);
+  const [gdriveEmail, setGdriveEmail]         = useState("");
+  const [gdriveConnecting, setGdriveConnecting] = useState(false);
+
+  // Google Workspace
+  const [gworkspaceOpen, setGworkspaceOpen]     = useState(false);
+  const [gworkspaceSaJson, setGworkspaceSaJson] = useState("");
+  const [gworkspaceStatus, setGworkspaceStatus] = useState<SaveStatus>("idle");
+  const [gworkspaceMsg, setGworkspaceMsg]       = useState("");
+  const [gworkspaceConnected, setGworkspaceConnected] = useState(false);
+  const [gworkspaceEmail, setGworkspaceEmail]   = useState("");
 
   const [biLoading, setBiLoading] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -217,6 +233,16 @@ export function Integrations() {
     const code   = params.get("code");
     const state  = params.get("state");
 
+    // Google Drive callback
+    if (params.get("gdrive_connected")) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setGdriveOpen(true);
+      fetch(`${API_URL}/auth/google/status`, { headers: h })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.connected) { setGdriveConnected(true); setGdriveEmail(d.gdrive_email); } })
+        .catch(() => {});
+    }
+
     if (code) {
       window.history.replaceState({}, "", window.location.pathname);
       setPersonalOpen(true);
@@ -251,6 +277,17 @@ export function Integrations() {
           localStorage.setItem("ms_personal_email", d.ms_email);
         }
       })
+      .catch(() => {});
+
+    // Google Drive status
+    fetch(`${API_URL}/auth/google/status`, { headers: h })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.connected) { setGdriveConnected(true); setGdriveEmail(d.gdrive_email); } })
+      .catch(() => {});
+
+    fetch(`${API_URL}/integrations/google-workspace/status`, { headers: h })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.connected) { setGworkspaceConnected(true); setGworkspaceEmail(d.client_email); setGworkspaceStatus("ok"); } })
       .catch(() => {});
   }, []);
 
@@ -329,15 +366,34 @@ export function Integrations() {
     setFilterDateFrom("");
 
     // Open and scroll to the card that triggered the scan
-    if (provider === "personal") { setPersonalOpen(true); setTimeout(() => personalCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
-    if (provider === "ms365")    { setMs365Open(true);    setTimeout(() => ms365CardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
-    if (provider === "azure")    { setAzureOpen(true);    setTimeout(() => azureCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "personal")          { setPersonalOpen(true);    setTimeout(() => personalCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "ms365")             { setMs365Open(true);       setTimeout(() => ms365CardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "azure")             { setAzureOpen(true);       setTimeout(() => azureCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "google_personal")   { setGdriveOpen(true);      setTimeout(() => gdriveCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
+    if (provider === "google_workspace")  { setGworkspaceOpen(true);  setTimeout(() => gworkspaceCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
 
-    const endpoint = provider === "ms365" ? "office365" : provider === "azure" ? "azure" : "personal";
+    const scanUrl = {
+      personal:          `${API_URL}/integrations/personal/scan-files?days=${inactivityDays}`,
+      ms365:             `${API_URL}/integrations/office365/scan-files?days=${inactivityDays}`,
+      azure:             `${API_URL}/integrations/azure/scan-files?days=${inactivityDays}`,
+      google_personal:   `${API_URL}/integrations/google/scan-files?provider=personal&days=${inactivityDays}`,
+      google_workspace:  `${API_URL}/integrations/google/scan-files?provider=workspace&days=${inactivityDays}`,
+    }[provider];
+
+    const statusUrl = (provider === "google_personal" || provider === "google_workspace")
+      ? `${API_URL}/integrations/google/scan-status`
+      : `${API_URL}/integrations/office365/scan-status`;
+
+    const resultsUrl = {
+      personal:          `${API_URL}/integrations/personal/file-results`,
+      ms365:             `${API_URL}/integrations/office365/file-results`,
+      azure:             `${API_URL}/integrations/azure/file-results`,
+      google_personal:   `${API_URL}/results`,
+      google_workspace:  `${API_URL}/results`,
+    }[provider];
+
     try {
-      const res = await fetch(`${API_URL}/integrations/${endpoint}/scan-files?days=${inactivityDays}`, {
-        method: "POST", headers: h,
-      });
+      const res = await fetch(scanUrl, { method: "POST", headers: h });
       if (!res.ok) {
         const d = await res.json();
         setCloudPhase("error");
@@ -347,7 +403,7 @@ export function Integrations() {
       stopCloudPoll();
       cloudPollRef.current = setInterval(async () => {
         try {
-          const s = await fetch(`${API_URL}/integrations/office365/scan-status`, { headers: h });
+          const s = await fetch(statusUrl, { headers: h });
           if (!s.ok) return;
           const d = await s.json();
           setCloudProgress(d.progress ?? 0);
@@ -357,15 +413,42 @@ export function Integrations() {
           if (!d.is_scanning) {
             setCloudPhase("done");
             stopCloudPoll();
-            // Load results
             setLoadingCloudFiles(true);
-            const r = await fetch(`${API_URL}/integrations/${endpoint}/file-results`, { headers: h });
+            const r = await fetch(resultsUrl, { headers: h });
             if (r.ok) { const rd = await r.json(); setCloudFiles(rd.items ?? []); }
             setLoadingCloudFiles(false);
           }
         } catch { /* ignore */ }
       }, 2000);
     } catch { setCloudPhase("error"); setCloudMsg("Servidor indisponível."); }
+  };
+
+  const connectGdrive = async () => {
+    setGdriveConnecting(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/google/login`, { headers: h });
+      if (!res.ok) { setGdriveConnecting(false); return; }
+      const { auth_url } = await res.json();
+      window.location.href = auth_url;
+    } catch { setGdriveConnecting(false); }
+  };
+
+  const saveGworkspace = async () => {
+    if (!gworkspaceSaJson.trim()) { setGworkspaceMsg("Cole o JSON do service account."); setGworkspaceStatus("error"); return; }
+    let parsed: any;
+    try { parsed = JSON.parse(gworkspaceSaJson); } catch { setGworkspaceMsg("JSON inválido."); setGworkspaceStatus("error"); return; }
+    setGworkspaceStatus("saving"); setGworkspaceMsg("");
+    try {
+      const res = await fetch(`${API_URL}/integrations/google-workspace/configure`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...h },
+        body: JSON.stringify({ service_account_json: parsed }),
+      });
+      if (!res.ok) { const d = await res.json(); setGworkspaceStatus("error"); setGworkspaceMsg(d.detail ?? `Erro ${res.status}`); return; }
+      setGworkspaceStatus("ok"); setGworkspaceMsg("Google Workspace configurado!");
+      setGworkspaceConnected(true);
+      setGworkspaceEmail(parsed.client_email ?? "");
+    } catch { setGworkspaceStatus("error"); setGworkspaceMsg("Servidor indisponível."); }
   };
 
   const downloadBiReport = async () => {
@@ -588,6 +671,96 @@ export function Integrations() {
           {azureUsers.length > 0 && <UserList users={azureUsers} label="Azure AD" />}
 
           {cloudProvider === "azure" && <ScanStatus {...scanStatusBase} color="#bc8cff" />}
+        </div>
+      </IntegrationCard>}
+
+      {/* Google Drive Pessoal */}
+      {!isCorporate && <IntegrationCard
+        ref={gdriveCardRef}
+        title="Google Drive Pessoal"
+        subtitle="OAuth — Meu Drive"
+        icon={<Cloud className="w-4 h-4" />}
+        color="#ea4335"
+        open={gdriveOpen}
+        onToggle={() => setGdriveOpen(v => !v)}
+      >
+        <div className="space-y-4">
+          {!gdriveConnected ? (
+            <button onClick={connectGdrive} disabled={gdriveConnecting}
+              className={`${btnCls} bg-[#ea4335]/10 border border-[#ea4335]/30 text-[#ea4335] hover:bg-[#ea4335]/20`}>
+              {gdriveConnecting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
+              Conectar com Google
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs text-[#3fb950]">
+                <Shield className="h-3.5 w-3.5" />
+                Conectado como <span className="font-medium">{gdriveEmail}</span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => startCloudScan("google_personal")} disabled={cloudPhase === "scanning"}
+                  className={`${btnCls} bg-[#ea4335]/10 border border-[#ea4335]/30 text-[#ea4335] hover:bg-[#ea4335]/20`}>
+                  {cloudPhase === "scanning" && cloudProvider === "google_personal"
+                    ? <RefreshCw className="h-4 w-4 animate-spin" />
+                    : <Cloud className="h-4 w-4" />}
+                  Varrer meu Drive
+                </button>
+                <button onClick={connectGdrive}
+                  className={`${btnCls} border border-border text-muted-foreground hover:text-foreground hover:bg-white/5`}>
+                  <RefreshCw className="h-3.5 w-3.5" />Reconectar
+                </button>
+              </div>
+            </div>
+          )}
+          {cloudProvider === "google_personal" && <ScanStatus {...scanStatusBase} color="#ea4335" />}
+        </div>
+      </IntegrationCard>}
+
+      {/* Google Workspace — apenas contas corporativas */}
+      {isCorporate && !isMember && <IntegrationCard
+        ref={gworkspaceCardRef}
+        title="Google Workspace"
+        subtitle="Service Account — Drive corporativo"
+        icon={<Building2 className="w-4 h-4" />}
+        color="#34a853"
+        open={gworkspaceOpen}
+        onToggle={() => setGworkspaceOpen(v => !v)}
+      >
+        <div className="space-y-4">
+          <div className="p-3 rounded-lg bg-[#34a853]/8 border border-[#34a853]/20 text-xs text-[#34a853] space-y-1">
+            <p className="font-semibold">Configuração no Google Cloud Console:</p>
+            <p className="text-[#34a853]/80">Crie uma Service Account com permissão de <strong>Domain-Wide Delegation</strong> e escopo <code className="bg-black/20 rounded px-1">drive.readonly</code>. Baixe a chave JSON e cole abaixo.</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Service Account JSON</label>
+            <textarea
+              rows={6}
+              value={gworkspaceSaJson}
+              onChange={e => setGworkspaceSaJson(e.target.value)}
+              placeholder={'{\n  "type": "service_account",\n  "project_id": "...",\n  ...\n}'}
+              className="w-full rounded-md border border-border bg-secondary px-3 py-2 text-xs font-mono text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30 resize-none"
+            />
+          </div>
+          {gworkspaceMsg && (
+            <p className={`text-xs ${gworkspaceStatus === "ok" ? "text-[#3fb950]" : "text-destructive"}`}>{gworkspaceMsg}</p>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={saveGworkspace} disabled={gworkspaceStatus === "saving"}
+              className={`${btnCls} bg-[#34a853]/10 border border-[#34a853]/30 text-[#34a853] hover:bg-[#34a853]/20`}>
+              {gworkspaceStatus === "saving" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+              Salvar credenciais
+            </button>
+            {gworkspaceStatus === "ok" && (
+              <button onClick={() => startCloudScan("google_workspace")} disabled={cloudPhase === "scanning"}
+                className={`${btnCls} bg-[#34a853]/10 border border-[#34a853]/30 text-[#34a853] hover:bg-[#34a853]/20`}>
+                {cloudPhase === "scanning" && cloudProvider === "google_workspace"
+                  ? <RefreshCw className="h-4 w-4 animate-spin" />
+                  : <Cloud className="h-4 w-4" />}
+                Varrer arquivos Drive
+              </button>
+            )}
+          </div>
+          {cloudProvider === "google_workspace" && <ScanStatus {...scanStatusBase} color="#34a853" />}
         </div>
       </IntegrationCard>}
 
