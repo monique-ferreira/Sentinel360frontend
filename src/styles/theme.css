@@ -1,5 +1,6 @@
 @custom-variant dark (&:is(.dark *));
 
+/* ── Modo escuro (padrão) ─────────────────────────────── */
 :root {
   --background: #0d1117;
   --foreground: #e6edf3;
@@ -39,10 +40,49 @@
   --chart-5: #bc8cff;
 
   --radius: 0.5rem;
-
   --font-size: 16px;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
+}
+
+/* ── Modo claro ───────────────────────────────────────── */
+.light {
+  --background: #f6f8fa;
+  --foreground: #1f2328;
+
+  --card: #ffffff;
+  --card-foreground: #1f2328;
+
+  --popover: #ffffff;
+  --popover-foreground: #1f2328;
+
+  --primary: #1a7f37;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0f2f4;
+  --secondary-foreground: #1f2328;
+
+  --muted: #f0f2f4;
+  --muted-foreground: #636c76;
+
+  --accent: #eaeef2;
+  --accent-foreground: #1f2328;
+
+  --destructive: #cf222e;
+  --destructive-foreground: #ffffff;
+
+  --border: rgba(31, 35, 40, 0.12);
+  --input: #f0f2f4;
+  --input-background: #f0f2f4;
+  --switch-background: #c8ccd0;
+
+  --ring: #1a7f37;
+
+  --chart-1: #1a7f37;
+  --chart-2: #0969da;
+  --chart-3: #cf222e;
+  --chart-4: #9a6700;
+  --chart-5: #8250df;
 }
 
 @theme inline {
@@ -105,5 +145,12 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(240, 246, 252, 0.25);
+  }
+
+  .light ::-webkit-scrollbar-thumb {
+    background: rgba(31, 35, 40, 0.15);
+  }
+  .light ::-webkit-scrollbar-thumb:hover {
+    background: rgba(31, 35, 40, 0.28);
   }
 }

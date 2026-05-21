@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard, FolderClock, ShieldAlert,
   Zap, FileBarChart2, LogOut, User,
-  ChevronLeft, ChevronRight, Bell, Shield, Building2,
+  ChevronLeft, ChevronRight, Bell, Shield, Building2, Sun, Moon,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
@@ -20,7 +20,22 @@ const BASE_NAV = [
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    (localStorage.getItem("s360_theme") as "dark" | "light") ?? "dark"
+  );
   const { logout, token } = useAuth();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "light") {
+      root.classList.add("light");
+      root.classList.remove("dark");
+    } else {
+      root.classList.remove("light");
+      root.classList.add("dark");
+    }
+    localStorage.setItem("s360_theme", theme);
+  }, [theme]);
   const location  = useLocation();
   const navigate  = useNavigate();
 
@@ -60,7 +75,7 @@ export function Layout() {
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {/* Sidebar */}
-      <aside className={`${collapsed ? "w-16" : "w-56"} flex flex-col bg-[#080d14] border-r border-border transition-all duration-200 shrink-0 relative z-20`}>
+      <aside className={`${collapsed ? "w-16" : "w-56"} flex flex-col bg-card border-r border-border transition-all duration-200 shrink-0 relative z-20`}>
 
         {/* Logo */}
         <div className={`h-14 flex items-center shrink-0 border-b border-border ${collapsed ? "justify-center px-0" : "px-4 gap-3"}`}>
@@ -85,7 +100,7 @@ export function Layout() {
                 `flex items-center gap-3 px-2.5 py-2 rounded-md text-sm transition-colors ${collapsed ? "justify-center" : ""} ${
                   isActive
                     ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary"
                 }`
               }
             >
@@ -112,7 +127,7 @@ export function Layout() {
               <LogOut className="w-4 h-4" />
             </button>
           ) : (
-            <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-white/5 group">
+            <div className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-secondary group">
               <button
                 onClick={() => navigate("/profile")}
                 title="Ver perfil"
@@ -150,6 +165,13 @@ export function Layout() {
             <p className="text-xs text-muted-foreground">Sentinel360 — Cyber Defense Platform</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
+              title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+              className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
             <button className="relative w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
               <Bell className="w-4 h-4" />
               <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
