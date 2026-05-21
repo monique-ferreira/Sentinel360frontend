@@ -49,6 +49,7 @@ export function SensitiveData() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("Todos");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "gdrive" | "onedrive">("all");
   const [userProfile, setUserProfile] = useState<any>(null);
   const [viewItem, setViewItem] = useState<any | null>(null);
 
@@ -80,7 +81,7 @@ export function SensitiveData() {
 
   useEffect(() => { load(); }, []);
 
-  // Filter by risk type + search
+  // Filter by risk type + search + source
   useEffect(() => {
     let result = items;
     if (activeFilter !== "Todos") result = result.filter(i => (i.riscos || i.Riscos || "").includes(activeFilter));
@@ -91,8 +92,14 @@ export function SensitiveData() {
         (i.caminho || i.Caminho || i.path || "").toLowerCase().includes(q)
       );
     }
+    if (sourceFilter !== "all") {
+      result = result.filter(i => {
+        const o = (i.origem || "").toLowerCase();
+        return sourceFilter === "gdrive" ? o.includes("google") : o.includes("onedrive") || o.includes("sharepoint");
+      });
+    }
     setFiltered(result);
-  }, [search, activeFilter, items]);
+  }, [search, activeFilter, sourceFilter, items]);
 
   // Count by risk type for filter chips
   const riskCounts: Record<string, number> = { Todos: items.length };
@@ -151,16 +158,35 @@ export function SensitiveData() {
             })}
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Filtrar por nome ou caminho..."
-              className="w-full h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors" />
-            {search && (
-              <button onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground">✕</button>
-            )}
+          {/* Search + source filter row */}
+          <div className="flex gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Filtrar por nome ou caminho..."
+                className="w-full h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-colors" />
+              {search && (
+                <button onClick={() => setSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground">✕</button>
+              )}
+            </div>
+            {/* Source filter */}
+            <div className="flex items-center gap-1 h-9 px-1 rounded-lg border border-border bg-card">
+              {(["all", "onedrive", "gdrive"] as const).map(s => {
+                const labels = { all: "Todos", onedrive: "OneDrive", gdrive: "Google Drive" };
+                const colors = { all: "#7d8590", onedrive: "#58a6ff", gdrive: "#f0883e" };
+                const active = sourceFilter === s;
+                return (
+                  <button key={s} onClick={() => setSourceFilter(s)}
+                    className="h-7 px-2.5 rounded text-[11px] font-medium transition-colors"
+                    style={active
+                      ? { background: colors[s] + "25", color: colors[s], border: `1px solid ${colors[s]}50` }
+                      : { color: "#7d8590" }}>
+                    {labels[s]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </>
       )}

@@ -29,6 +29,7 @@ export function InactiveFiles() {
   const [threshold, setThreshold] = useState<number>(180);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [viewItem, setViewItem] = useState<any | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "gdrive" | "onedrive">("all");
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -84,7 +85,11 @@ export function InactiveFiles() {
     const q     = search.toLowerCase();
     const matchSearch = !search.trim() || name.includes(q) || path.includes(q);
     const matchDate   = !dateFrom || ((i.ultimo_acesso || i.last_scan || "") >= dateFrom);
-    return matchSearch && matchDate;
+    const origem = (i.origem || "").toLowerCase();
+    const matchSource = sourceFilter === "all"
+      || (sourceFilter === "gdrive" && origem.includes("google"))
+      || (sourceFilter === "onedrive" && (origem.includes("onedrive") || origem.includes("sharepoint")));
+    return matchSearch && matchDate && matchSource;
   });
 
   const totalMB = inactive.reduce(
@@ -182,6 +187,23 @@ export function InactiveFiles() {
               <button onClick={() => setDateFrom("")}
                 className="text-xs text-muted-foreground hover:text-foreground px-1">✕</button>
             )}
+          </div>
+          {/* Source filter */}
+          <div className="flex items-center gap-1 h-9 px-1 rounded-lg border border-border bg-card">
+            {(["all", "onedrive", "gdrive"] as const).map(s => {
+              const labels = { all: "Todos", onedrive: "OneDrive", gdrive: "Google Drive" };
+              const colors = { all: "#7d8590", onedrive: "#58a6ff", gdrive: "#f0883e" };
+              const active = sourceFilter === s;
+              return (
+                <button key={s} onClick={() => setSourceFilter(s)}
+                  className="h-7 px-2.5 rounded text-[11px] font-medium transition-colors"
+                  style={active
+                    ? { background: colors[s] + "25", color: colors[s], border: `1px solid ${colors[s]}50` }
+                    : { color: "#7d8590" }}>
+                  {labels[s]}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
