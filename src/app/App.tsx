@@ -10,6 +10,8 @@ function App() {
   const handleLogin = (t: string) => {
     localStorage.setItem(TOKEN_KEY, t);
     setToken(t);
+    // Always land on dashboard after login
+    router.navigate("/", { replace: true });
   };
 
   const handleLogout = () => {

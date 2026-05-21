@@ -65,16 +65,26 @@ export function Dashboard() {
   const [error, setError] = useState("");
   const [lastUpdate, setLastUpdate] = useState("");
   const [threshold, setThreshold] = useState(180);
+  const [isPending, setIsPending] = useState(false);
 
   const h = { Authorization: `Bearer ${token}` };
 
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const [resultsRes, settingsRes] = await Promise.all([
+      const [resultsRes, settingsRes, meRes] = await Promise.all([
         fetch(`${API_URL}/results`, { headers: h }),
         fetch(`${API_URL}/user/settings`, { headers: h }),
+        fetch(`${API_URL}/user/me`, { headers: h }),
       ]);
+      if (meRes.ok) {
+        const me = await meRes.json();
+        if (me?.account_type === "corporate" && me?.org_status === "pending") {
+          setIsPending(true);
+          setLoading(false);
+          return;
+        }
+      }
       if (!resultsRes.ok) throw new Error(`Erro ${resultsRes.status}`);
       const data = await resultsRes.json();
       setItems(data.items ?? []);
@@ -125,6 +135,33 @@ export function Dashboard() {
   const topRisk = items
     .filter(i => { const r = i.riscos || i.Riscos || ""; return r && r !== "NENHUM" && r !== "Nenhum"; })
     .slice(0, 6);
+
+  if (isPending) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-6 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+          <HardDrive className="w-7 h-7 text-yellow-400" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-2">Aguardando aprovação</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Sua solicitação de entrada na organização está sendo analisada pelo administrador.
+            Você terá acesso completo ao Sentinel360 assim que for aprovado.
+          </p>
+        </div>
+        <div className="w-full p-4 rounded-xl bg-yellow-500/5 border border-yellow-500/20 text-xs text-yellow-400/80 text-left space-y-1">
+          <p className="font-medium text-yellow-400">O que acontece depois?</p>
+          <p>• O administrador receberá sua solicitação no Workspace.</p>
+          <p>• Ao ser aprovado, você terá acesso às integrações e relatórios da organização.</p>
+          <p>• Você pode fechar essa janela — seu status é atualizado automaticamente.</p>
+        </div>
+        <button onClick={load}
+          className="flex items-center gap-2 px-4 py-2 rounded-md border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+          <RefreshCw className="w-3.5 h-3.5" /> Verificar status
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
