@@ -278,8 +278,10 @@ export function MemberData() {
                   return (
                     <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-4 py-3">
-                        <span className="font-medium text-foreground truncate block max-w-[220px]" title={item.nome}>{item.nome || item.name}</span>
-                        <span className="text-xs text-muted-foreground truncate block max-w-[220px]">{item.caminho || item.path}</span>
+                        <a href={item.caminho || item.path || "#"} target="_blank" rel="noreferrer"
+                          className="font-medium text-foreground break-words whitespace-normal hover:text-primary transition-colors block max-w-[280px]"
+                          title={item.nome || item.name}>{item.nome || item.name}</a>
+                        <span className="text-xs text-muted-foreground break-all whitespace-normal block max-w-[280px] mt-0.5">{item.caminho || item.path}</span>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${

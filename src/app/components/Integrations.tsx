@@ -480,8 +480,8 @@ export function Integrations() {
         </div>
       </IntegrationCard>}
 
-      {/* MS365 */}
-      <IntegrationCard
+      {/* MS365 — apenas contas corporativas */}
+      {isCorporate && <IntegrationCard
         ref={ms365CardRef}
         title="Microsoft 365"
         subtitle="Exchange, SharePoint, Teams"
@@ -533,10 +533,10 @@ export function Integrations() {
 
           {cloudProvider === "ms365" && <ScanStatus {...scanStatusBase} color="#58a6ff" />}
         </div>
-      </IntegrationCard>
+      </IntegrationCard>}
 
-      {/* Azure AD */}
-      <IntegrationCard
+      {/* Azure AD — apenas contas corporativas */}
+      {isCorporate && <IntegrationCard
         ref={azureCardRef}
         title="Azure Active Directory"
         subtitle="Identidade, Usuários, Grupos"
@@ -589,7 +589,7 @@ export function Integrations() {
 
           {cloudProvider === "azure" && <ScanStatus {...scanStatusBase} color="#bc8cff" />}
         </div>
-      </IntegrationCard>
+      </IntegrationCard>}
 
       {/* BI Report */}
       <div className="rounded-xl border border-border bg-card p-5 flex items-center justify-between gap-4">

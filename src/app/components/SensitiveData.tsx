@@ -34,13 +34,21 @@ export function SensitiveData() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("Todos");
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  const h = { Authorization: `Bearer ${token}` };
+
+  const isCorporate = userProfile?.account_type === "corporate";
+  const isAdmin     = isCorporate && userProfile?.org_role === "admin";
+  const canOpenFile = !isCorporate || isAdmin;
 
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${API_URL}/results`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const [res, profileRes] = await Promise.all([
+        fetch(`${API_URL}/results`, { headers: h }),
+        fetch(`${API_URL}/user/me`, { headers: h }),
+      ]);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       const data = await res.json();
       const risky = (data.items ?? []).filter((i: any) => {
@@ -48,6 +56,7 @@ export function SensitiveData() {
         return r && r !== "NENHUM" && r !== "Nenhum";
       });
       setItems(risky); setFiltered(risky);
+      if (profileRes.ok) setUserProfile(await profileRes.json());
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponível." : e.message);
     } finally { setLoading(false); }
@@ -175,17 +184,28 @@ export function SensitiveData() {
                         <div className="w-7 h-7 rounded-md bg-[#f85149]/10 flex items-center justify-center shrink-0">
                           <ShieldAlert className="w-3.5 h-3.5 text-[#f85149]" />
                         </div>
-                        <span className="font-medium text-foreground truncate max-w-[160px]">
-                          {item.nome || item.Arquivo || item.name}
-                        </span>
+                        {canOpenFile ? (
+                          <a href={item.caminho || item.Caminho || "#"} target="_blank" rel="noreferrer"
+                            className="font-medium text-foreground truncate max-w-[160px] hover:text-primary transition-colors"
+                            title={item.nome || item.Arquivo || item.name}>
+                            {item.nome || item.Arquivo || item.name}
+                          </a>
+                        ) : (
+                          <span className="font-medium text-foreground truncate max-w-[160px]">
+                            {item.nome || item.Arquivo || item.name}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3"><RiskBadge risk={r} /></td>
                     <td className="px-4 py-3 text-muted-foreground text-xs truncate max-w-[240px] hidden md:table-cell">
                       {item.caminho || item.Caminho || item.path}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell">
-                      {item.last_scan || item.Data || "—"}
+                    <td className="px-4 py-3 text-xs hidden lg:table-cell">
+                      <span className="text-muted-foreground">{item.ultimo_acesso || "—"}</span>
+                      {item.last_scan && (
+                        <span className="block text-[10px] text-muted-foreground/50 mt-0.5">scan: {item.last_scan.slice(0, 10)}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-xs font-medium text-muted-foreground tabular-nums">
                       {item.tamanho_mb ?? item.Tamanho_MB ?? item.size_mb} MB

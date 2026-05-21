@@ -29,8 +29,13 @@ export function Reports() {
   const [threshold, setThreshold] = useState(180);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   const h = { Authorization: `Bearer ${token}` };
+
+  const isCorporate = userProfile?.account_type === "corporate";
+  const isAdmin     = isCorporate && userProfile?.org_role === "admin";
+  const canOpenFile = !isCorporate || isAdmin;
 
   const checkInactive = (i: any, thr: number) => {
     const days = parseInt(i.dias_sem_acesso ?? "-1", 10);
@@ -41,9 +46,10 @@ export function Reports() {
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const [resultsRes, settingsRes] = await Promise.all([
+      const [resultsRes, settingsRes, profileRes] = await Promise.all([
         fetch(`${API_URL}/results`, { headers: h }),
         fetch(`${API_URL}/user/settings`, { headers: h }),
+        fetch(`${API_URL}/user/me`, { headers: h }),
       ]);
       if (!resultsRes.ok) throw new Error(`Erro ${resultsRes.status}`);
       const data = await resultsRes.json();
@@ -53,6 +59,7 @@ export function Reports() {
         const s = await settingsRes.json();
         if (s?.inactivity_days) { thr = s.inactivity_days; setThreshold(thr); }
       }
+      if (profileRes.ok) setUserProfile(await profileRes.json());
       setItems(all); setFiltered(all);
     } catch (e: any) {
       setError(e.message?.includes("fetch") ? "Servidor indisponível. Aguarde o servidor iniciar (30s)." : e.message);
@@ -292,8 +299,14 @@ export function Reports() {
                 return (
                   <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-medium text-foreground truncate block max-w-[180px]" title={nome}>{nome}</span>
-                      <span className="text-xs text-muted-foreground truncate block max-w-[180px]">{item.caminho || item.Caminho || item.path}</span>
+                      {canOpenFile ? (
+                        <a href={path || "#"} target="_blank" rel="noreferrer"
+                          className="font-medium text-foreground break-words whitespace-normal hover:text-primary transition-colors block max-w-[320px]"
+                          title={nome}>{nome}</a>
+                      ) : (
+                        <span className="font-medium text-foreground break-words whitespace-normal block max-w-[320px]">{nome}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground break-all whitespace-normal block max-w-[320px] mt-0.5">{path}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
