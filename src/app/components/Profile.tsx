@@ -22,6 +22,7 @@ export function Profile() {
   const [inactivityDays, setInactivityDays] = useState(180);
   const [autoScanInterval, setAutoScanInterval] = useState("never");
   const [autoScanHour, setAutoScanHour] = useState(6);
+  const [autoScanMinute, setAutoScanMinute] = useState(0);
   const [autoScanDay, setAutoScanDay] = useState(1);
   const [lastAutoScan, setLastAutoScan] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -41,6 +42,7 @@ export function Profile() {
       setInactivityDays(data.inactivity_days ?? 180);
       setAutoScanInterval(data.auto_scan_interval ?? "never");
       setAutoScanHour(data.auto_scan_hour ?? 6);
+      setAutoScanMinute(data.auto_scan_minute ?? 0);
       setAutoScanDay(data.auto_scan_day ?? 1);
       setLastAutoScan(data.last_auto_scan ?? null);
     } catch (e: any) {
@@ -63,6 +65,7 @@ export function Profile() {
           inactivity_days:     inactivityDays,
           auto_scan_interval:  autoScanInterval,
           auto_scan_hour:      autoScanHour,
+          auto_scan_minute:    autoScanMinute,
           auto_scan_day:       autoScanDay,
         }),
       });
@@ -290,10 +293,13 @@ export function Profile() {
                 <label className="block text-xs text-muted-foreground mb-1">Horário</label>
                 <input
                   type="time"
-                  step="3600"
                   className="h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
-                  value={`${String(autoScanHour).padStart(2,"0")}:00`}
-                  onChange={e => setAutoScanHour(Number(e.target.value.split(":")[0]))}
+                  value={`${String(autoScanHour).padStart(2,"0")}:${String(autoScanMinute).padStart(2,"0")}`}
+                  onChange={e => {
+                    const [h, m] = e.target.value.split(":");
+                    setAutoScanHour(Number(h));
+                    setAutoScanMinute(Number(m));
+                  }}
                   disabled={saveStatus === "saving"}
                 />
               </div>
