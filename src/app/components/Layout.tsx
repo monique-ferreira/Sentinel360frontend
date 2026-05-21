@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard, FolderClock, ShieldAlert,
   Zap, FileBarChart2, LogOut, User,
-  ChevronLeft, ChevronRight, Bell, Shield, Building2, Sun, Moon,
+  ChevronLeft, ChevronRight, Shield, Building2, Sun, Moon,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
@@ -168,13 +168,9 @@ export function Layout() {
             <button
               onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
               title={theme === "dark" ? "Modo claro" : "Modo escuro"}
-              className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+              className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
               {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-            <button className="relative w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors">
-              <Bell className="w-4 h-4" />
-              <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full" />
             </button>
           </div>
         </header>
