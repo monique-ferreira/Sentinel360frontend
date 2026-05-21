@@ -190,11 +190,6 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
           )}
           {!loading && !error && binaryData && (
             <>
-              {truncated && (
-                <div className="mb-3 px-3 py-2 rounded-lg bg-[#d29922]/10 border border-[#d29922]/20 text-xs text-[#d29922]">
-                  Exibindo primeiros 5 MB do arquivo.
-                </div>
-              )}
               {binaryData.mime.startsWith("image/") && (
                 <div className="flex items-center justify-center bg-secondary/20 rounded-xl border border-border p-4 min-h-[200px]">
                   <img
