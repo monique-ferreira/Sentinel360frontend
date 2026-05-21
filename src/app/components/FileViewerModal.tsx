@@ -1,8 +1,65 @@
-import { useEffect, useState } from "react";
-import { X, FileText, AlertCircle, RefreshCw, ShieldCheck, ShieldAlert, ExternalLink } from "lucide-react";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { X, FileText, AlertCircle, RefreshCw, ShieldCheck, ShieldAlert, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "../AuthContext";
+import * as pdfjsLib from "pdfjs-dist";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
+
+function PdfViewer({ data }: { data: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [pdf, setPdf] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [rendering, setRendering] = useState(false);
+
+  useEffect(() => {
+    const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+    pdfjsLib.getDocument({ data: bytes }).promise.then(doc => {
+      setPdf(doc);
+      setTotalPages(doc.numPages);
+      setPage(1);
+    });
+  }, [data]);
+
+  const renderPage = useCallback(async (num: number) => {
+    if (!pdf || !canvasRef.current) return;
+    setRendering(true);
+    const p = await pdf.getPage(num);
+    const viewport = p.getViewport({ scale: 1.5 });
+    const canvas = canvasRef.current;
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await p.render({ canvasContext: canvas.getContext("2d")!, viewport }).promise;
+    setRendering(false);
+  }, [pdf]);
+
+  useEffect(() => { renderPage(page); }, [pdf, page, renderPage]);
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      {totalPages > 1 && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1 || rendering}
+            className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-white/5 disabled:opacity-40 transition-colors">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+          <span>Página <strong className="text-foreground">{page}</strong> de {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || rendering}
+            className="w-7 h-7 rounded-md border border-border flex items-center justify-center hover:bg-white/5 disabled:opacity-40 transition-colors">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+      {rendering && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
+      <canvas ref={canvasRef as any} className="max-w-full rounded-lg border border-border shadow-sm" />
+    </div>
+  );
+}
 
 interface Props {
   item: { nome?: string; Arquivo?: string; name?: string; caminho?: string; Caminho?: string; path?: string } | null;
@@ -200,12 +257,7 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
                 </div>
               )}
               {binaryData.mime === "application/pdf" && (
-                <iframe
-                  src={`data:application/pdf;base64,${binaryData.data}`}
-                  className="w-full rounded-xl border border-border"
-                  style={{ height: "60vh" }}
-                  title={nome}
-                />
+                <PdfViewer data={binaryData.data} />
               )}
             </>
           )}
