@@ -15,6 +15,7 @@ type VtStatus = "idle" | "loading" | "found" | "not_found" | "error" | "no_hash"
 export function FileViewerModal({ item, onClose, targetUsername }: Props) {
   const { token } = useAuth();
   const [content, setContent] = useState("");
+  const [binaryData, setBinaryData] = useState<{ mime: string; data: string } | null>(null);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +30,7 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
 
   useEffect(() => {
     if (!item) return;
-    setContent(""); setError(""); setTruncated(false);
+    setContent(""); setBinaryData(null); setError(""); setTruncated(false);
     setVtStatus("idle"); setVtData(null); setVtError("");
     setLoading(true);
     fetch(`${API_URL}/file-preview?path=${encodeURIComponent(path)}${qs}`, {
@@ -39,7 +40,14 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
         if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail ?? `Erro ${r.status}`); }
         return r.json();
       })
-      .then(d => { setContent(d.content); setTruncated(d.truncated); })
+      .then(d => {
+        if (d.type === "binary") {
+          setBinaryData({ mime: d.mime, data: d.data });
+        } else {
+          setContent(d.content);
+        }
+        setTruncated(d.truncated);
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, [item]);
@@ -180,6 +188,33 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
               </div>
             </div>
           )}
+          {!loading && !error && binaryData && (
+            <>
+              {truncated && (
+                <div className="mb-3 px-3 py-2 rounded-lg bg-[#d29922]/10 border border-[#d29922]/20 text-xs text-[#d29922]">
+                  Exibindo primeiros 5 MB do arquivo.
+                </div>
+              )}
+              {binaryData.mime.startsWith("image/") && (
+                <div className="flex items-center justify-center bg-secondary/20 rounded-xl border border-border p-4 min-h-[200px]">
+                  <img
+                    src={`data:${binaryData.mime};base64,${binaryData.data}`}
+                    alt={nome}
+                    className="max-w-full max-h-[55vh] object-contain rounded-lg"
+                  />
+                </div>
+              )}
+              {binaryData.mime === "application/pdf" && (
+                <iframe
+                  src={`data:application/pdf;base64,${binaryData.data}`}
+                  className="w-full rounded-xl border border-border"
+                  style={{ height: "60vh" }}
+                  title={nome}
+                />
+              )}
+            </>
+          )}
+
           {!loading && !error && content && (
             <>
               {truncated && (
