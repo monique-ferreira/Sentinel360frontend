@@ -180,15 +180,22 @@ export function Integrations() {
   const cloudPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [biLoading, setBiLoading] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   const h = { Authorization: `Bearer ${token}` };
 
-  // Load inactivity_days from server on mount
+  const isCorporate = userProfile?.account_type === "corporate";
+  const isMember    = isCorporate && userProfile?.org_role !== "admin";
+
+  // Load inactivity_days + user profile on mount
   useEffect(() => {
-    fetch(`${API_URL}/user/settings`, { headers: h })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.inactivity_days) setInactivityDays(d.inactivity_days); })
-      .catch(() => {});
+    Promise.all([
+      fetch(`${API_URL}/user/settings`, { headers: h }).then(r => r.ok ? r.json() : null),
+      fetch(`${API_URL}/user/me`, { headers: h }).then(r => r.ok ? r.json() : null),
+    ]).then(([settings, profile]) => {
+      if (settings?.inactivity_days) setInactivityDays(settings.inactivity_days);
+      if (profile) setUserProfile(profile);
+    }).catch(() => {});
   }, [token]);
 
   const saveInactivityDays = (val: number) => {
@@ -419,8 +426,8 @@ export function Integrations() {
         </div>
       </div>
 
-      {/* Conta pessoal Microsoft */}
-      <IntegrationCard
+      {/* Conta pessoal Microsoft — oculto para contas corporativas */}
+      {!isCorporate && <IntegrationCard
         ref={personalCardRef}
         title="Conta Microsoft Pessoal"
         subtitle="OneDrive, arquivos e documentos pessoais"
@@ -471,7 +478,7 @@ export function Integrations() {
 
           {cloudProvider === "personal" && <ScanStatus {...scanStatusBase} color="#3fb950" />}
         </div>
-      </IntegrationCard>
+      </IntegrationCard>}
 
       {/* MS365 */}
       <IntegrationCard
@@ -595,11 +602,13 @@ export function Integrations() {
             <p className="text-xs text-muted-foreground">Excel com abas de dados, gráficos e histórico — abrível no Power BI Desktop via "Obter Dados &gt; Excel"</p>
           </div>
         </div>
-        <button onClick={downloadBiReport} disabled={biLoading}
-          className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20 shrink-0`}>
-          {biLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-          Baixar BI (.xlsx)
-        </button>
+        {!isMember && (
+          <button onClick={downloadBiReport} disabled={biLoading}
+            className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20 shrink-0`}>
+            {biLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Baixar BI (.xlsx)
+          </button>
+        )}
       </div>
     </div>
   );
