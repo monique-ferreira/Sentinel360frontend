@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff, FolderClock, Search, FolderOpen, Clock } from "lucide-react";
 import { useAuth } from "../AuthContext";
+import { FileViewerModal } from "./FileViewerModal";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
@@ -13,6 +14,7 @@ export function InactiveFiles() {
   const [dateFrom, setDateFrom] = useState("");
   const [threshold, setThreshold] = useState<number>(180);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [viewItem, setViewItem] = useState<any | null>(null);
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -76,6 +78,8 @@ export function InactiveFiles() {
   );
 
   return (
+    <>
+    <FileViewerModal item={viewItem} onClose={() => setViewItem(null)} />
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -209,11 +213,10 @@ export function InactiveFiles() {
                           <FolderClock className="w-3.5 h-3.5 text-[#d29922]" />
                         </div>
                         {canOpenFile ? (
-                          <a href={item.caminho || item.Caminho || "#"} target="_blank" rel="noreferrer"
-                            className="font-medium text-foreground truncate max-w-[180px] hover:text-primary transition-colors"
-                            title={item.nome || item.Arquivo || item.name}>
+                          <button onClick={() => setViewItem(item)}
+                            className="font-medium text-foreground truncate max-w-[180px] hover:text-primary transition-colors text-left">
                             {item.nome || item.Arquivo || item.name}
-                          </a>
+                          </button>
                         ) : (
                           <span className="font-medium text-foreground truncate max-w-[180px]">
                             {item.nome || item.Arquivo || item.name}
@@ -259,5 +262,6 @@ export function InactiveFiles() {
         </div>
       )}
     </div>
+    </>
   );
 }

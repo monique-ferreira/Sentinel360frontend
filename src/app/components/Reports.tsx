@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff, FileBarChart2, Search, Trash2, CheckCircle2, Calendar, AlertTriangle } from "lucide-react";
 import { useAuth } from "../AuthContext";
+import { FileViewerModal } from "./FileViewerModal";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
@@ -30,6 +31,7 @@ export function Reports() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [viewItem, setViewItem] = useState<any | null>(null);
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -123,6 +125,8 @@ export function Reports() {
     }`;
 
   return (
+    <>
+    <FileViewerModal item={viewItem} onClose={() => setViewItem(null)} />
     <div className="space-y-5">
       {/* Delete confirmation modal */}
       {confirmItem && (
@@ -300,9 +304,10 @@ export function Reports() {
                   <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-3">
                       {canOpenFile ? (
-                        <a href={path || "#"} target="_blank" rel="noreferrer"
-                          className="font-medium text-foreground break-words whitespace-normal hover:text-primary transition-colors block max-w-[320px]"
-                          title={nome}>{nome}</a>
+                        <button onClick={() => setViewItem(item)}
+                          className="font-medium text-foreground break-words whitespace-normal hover:text-primary transition-colors block max-w-[320px] text-left">
+                          {nome}
+                        </button>
                       ) : (
                         <span className="font-medium text-foreground break-words whitespace-normal block max-w-[320px]">{nome}</span>
                       )}
@@ -358,5 +363,6 @@ export function Reports() {
         </div>
       )}
     </div>
+    </>
   );
 }

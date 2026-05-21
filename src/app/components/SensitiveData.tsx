@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff, ShieldAlert, Search, ShieldOff } from "lucide-react";
 import { useAuth } from "../AuthContext";
+import { FileViewerModal } from "./FileViewerModal";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
@@ -35,6 +36,7 @@ export function SensitiveData() {
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("Todos");
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [viewItem, setViewItem] = useState<any | null>(null);
 
   const h = { Authorization: `Bearer ${token}` };
 
@@ -87,6 +89,8 @@ export function SensitiveData() {
   const filters = ["Todos", ...Object.keys(riskCounts).filter(k => k !== "Todos")];
 
   return (
+    <>
+    <FileViewerModal item={viewItem} onClose={() => setViewItem(null)} />
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -185,11 +189,10 @@ export function SensitiveData() {
                           <ShieldAlert className="w-3.5 h-3.5 text-[#f85149]" />
                         </div>
                         {canOpenFile ? (
-                          <a href={item.caminho || item.Caminho || "#"} target="_blank" rel="noreferrer"
-                            className="font-medium text-foreground truncate max-w-[160px] hover:text-primary transition-colors"
-                            title={item.nome || item.Arquivo || item.name}>
+                          <button onClick={() => setViewItem(item)}
+                            className="font-medium text-foreground truncate max-w-[160px] hover:text-primary transition-colors text-left">
                             {item.nome || item.Arquivo || item.name}
-                          </a>
+                          </button>
                         ) : (
                           <span className="font-medium text-foreground truncate max-w-[160px]">
                             {item.nome || item.Arquivo || item.name}
@@ -226,5 +229,6 @@ export function SensitiveData() {
         </div>
       )}
     </div>
+    </>
   );
 }

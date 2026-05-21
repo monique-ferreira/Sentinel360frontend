@@ -6,6 +6,7 @@ import {
   Calendar, ChevronLeft, ChevronRight, Loader2,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
+import { FileViewerModal } from "./FileViewerModal";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 const PAGE_SIZE = 50;
@@ -37,6 +38,7 @@ export function MemberData() {
   const [dateFrom, setDateFrom]       = useState("");
   const [dateTo, setDateTo]           = useState("");
 
+  const [viewItem, setViewItem] = useState<any | null>(null);
   // pagination
   const [page, setPage] = useState(1);
 
@@ -137,6 +139,8 @@ export function MemberData() {
   const hasFilters = search || statusFilter !== "todos" || riskFilter !== "todos" || dateFrom || dateTo;
 
   return (
+    <>
+    <FileViewerModal item={viewItem} onClose={() => setViewItem(null)} targetUsername={targetUsername} />
     <div className="space-y-5">
       {/* Back + header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -278,9 +282,10 @@ export function MemberData() {
                   return (
                     <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-4 py-3">
-                        <a href={item.caminho || item.path || "#"} target="_blank" rel="noreferrer"
-                          className="font-medium text-foreground break-words whitespace-normal hover:text-primary transition-colors block max-w-[280px]"
-                          title={item.nome || item.name}>{item.nome || item.name}</a>
+                        <button onClick={() => setViewItem(item)}
+                          className="font-medium text-foreground break-words whitespace-normal hover:text-primary transition-colors block max-w-[280px] text-left">
+                          {item.nome || item.name}
+                        </button>
                         <span className="text-xs text-muted-foreground break-all whitespace-normal block max-w-[280px] mt-0.5">{item.caminho || item.path}</span>
                       </td>
                       <td className="px-4 py-3">
@@ -348,5 +353,6 @@ export function MemberData() {
         </div>
       )}
     </div>
+    </>
   );
 }
