@@ -288,16 +288,14 @@ export function Profile() {
               {/* Hour */}
               <div>
                 <label className="block text-xs text-muted-foreground mb-1">Horário</label>
-                <select
+                <input
+                  type="time"
+                  step="3600"
                   className="h-9 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors"
-                  value={autoScanHour}
-                  onChange={e => setAutoScanHour(Number(e.target.value))}
+                  value={`${String(autoScanHour).padStart(2,"0")}:00`}
+                  onChange={e => setAutoScanHour(Number(e.target.value.split(":")[0]))}
                   disabled={saveStatus === "saving"}
-                >
-                  {Array.from({length: 24}, (_, i) => i).map(h => (
-                    <option key={h} value={h}>{String(h).padStart(2,"0")}:00</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
           )}
