@@ -240,13 +240,16 @@ export function Reports() {
             <span className="text-xs text-muted-foreground mr-1">Origem:</span>
             {(["all", "onedrive", "gdrive"] as const).map(s => {
               const labels = { all: "Todos", onedrive: "OneDrive", gdrive: "Google Drive" };
-              const colors = { all: "#7d8590", onedrive: "#58a6ff", gdrive: "#f0883e" };
+              const colors = { all: null, onedrive: "#58a6ff", gdrive: "#f0883e" };
               const active = sourceFilter === s;
+              const color = colors[s];
               return (
                 <button key={s} onClick={() => setSourceFilter(s)}
-                  className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer"
-                  style={active
-                    ? { borderColor: colors[s] + "40", background: colors[s] + "18", color: colors[s] }
+                  className={active && color
+                    ? "px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer"
+                    : chipBtn(active && !color)}
+                  style={active && color
+                    ? { borderColor: color + "40", background: color + "18", color }
                     : {}}>
                   {labels[s]}
                 </button>
