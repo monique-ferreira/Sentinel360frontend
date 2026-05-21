@@ -51,7 +51,7 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await res.json();
-      if (res.status === 400 && d.detail?.includes("Chave")) { setVtStatus("no_key"); setVtError(d.detail); return; }
+      if (res.status === 503) { setVtStatus("no_key"); setVtError("VirusTotal não configurado no servidor."); return; }
       if (res.status === 422) { setVtStatus("no_hash"); setVtError(d.detail); return; }
       if (!res.ok) { setVtStatus("error"); setVtError(d.detail ?? `Erro ${res.status}`); return; }
       if (d.status === "not_found") { setVtStatus("not_found"); setVtData(d); return; }
@@ -134,6 +134,9 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
                     <span className="text-xs text-muted-foreground">
                       {vtData.threat_names.slice(0, 3).join(", ")}
                     </span>
+                  )}
+                  {vtData.from_cache && (
+                    <span className="text-[10px] text-muted-foreground/50 border border-border rounded px-1.5 py-0.5">cache</span>
                   )}
                   <a href={vtData.vt_link} target="_blank" rel="noreferrer"
                     className="ml-auto flex items-center gap-1 text-[10px] text-[#394eff] hover:underline shrink-0">
