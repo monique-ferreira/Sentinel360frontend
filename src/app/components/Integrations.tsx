@@ -680,14 +680,14 @@ export function Integrations() {
         title="Google Drive Pessoal"
         subtitle="Meu Drive pessoal"
         icon={<Cloud className="w-4 h-4" />}
-        color="#d29922"
+        color="#f0883e"
         open={gdriveOpen}
         onToggle={() => setGdriveOpen(v => !v)}
       >
         <div className="space-y-4">
           {!gdriveConnected ? (
             <button onClick={connectGdrive} disabled={gdriveConnecting}
-              className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20`}>
+              className={`${btnCls} bg-[#f0883e]/10 border border-[#f0883e]/30 text-[#f0883e] hover:bg-[#f0883e]/20`}>
               {gdriveConnecting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
               Conectar com Google
             </button>
@@ -699,7 +699,7 @@ export function Integrations() {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button onClick={() => startCloudScan("google_personal")} disabled={cloudPhase === "scanning"}
-                  className={`${btnCls} bg-[#d29922]/10 border border-[#d29922]/30 text-[#d29922] hover:bg-[#d29922]/20`}>
+                  className={`${btnCls} bg-[#f0883e]/10 border border-[#f0883e]/30 text-[#f0883e] hover:bg-[#f0883e]/20`}>
                   {cloudPhase === "scanning" && cloudProvider === "google_personal"
                     ? <RefreshCw className="h-4 w-4 animate-spin" />
                     : <Cloud className="h-4 w-4" />}
@@ -712,7 +712,7 @@ export function Integrations() {
               </div>
             </div>
           )}
-          {cloudProvider === "google_personal" && <ScanStatus {...scanStatusBase} color="#d29922" />}
+          {cloudProvider === "google_personal" && <ScanStatus {...scanStatusBase} color="#f0883e" />}
         </div>
       </IntegrationCard>}
 

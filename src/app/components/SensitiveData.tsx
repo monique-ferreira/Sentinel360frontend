@@ -7,11 +7,12 @@ function OrigemTag({ origem }: { origem?: string }) {
   if (!origem) return <span className="text-xs text-muted-foreground">—</span>;
   const isGdrive   = origem.toLowerCase().includes("google");
   const isOneDrive = origem.toLowerCase().includes("onedrive") || origem.toLowerCase().includes("sharepoint");
-  const color = isGdrive ? "#d29922" : isOneDrive ? "#58a6ff" : "#7d8590";
+  const color = isGdrive ? "#f0883e" : isOneDrive ? "#58a6ff" : "#7d8590";
+  const label = isGdrive ? "Google Drive" : isOneDrive ? "OneDrive" : origem.length > 16 ? origem.slice(0, 14) + "…" : origem;
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold tracking-wide uppercase border whitespace-nowrap"
       style={{ color, borderColor: color + "40", background: color + "15" }}>
-      {origem.length > 22 ? origem.slice(0, 20) + "…" : origem}
+      {label}
     </span>
   );
 }
