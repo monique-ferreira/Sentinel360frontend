@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import {
   Building2, Users, CheckCircle2, XCircle, RefreshCw,
   AlertCircle, Loader2, ShieldAlert, FolderClock, HardDrive,
-  Zap, Eye, ShieldCheck, Download, X,
+  Zap, Eye, ShieldCheck, Download,
 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
@@ -17,10 +18,8 @@ export function Workspace() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState("");
 
-  const [selectedMember, setSelectedMember] = useState<string | null>(null);
-  const [memberResults, setMemberResults] = useState<any[]>([]);
-  const [memberResultsLoading, setMemberResultsLoading] = useState(false);
   const [scanning, setScanning] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -86,20 +85,6 @@ export function Workspace() {
       setScanning(null);
       setTimeout(() => setActionMsg(""), 4000);
     }
-  };
-
-  const handleViewData = async (targetUsername: string) => {
-    setSelectedMember(targetUsername);
-    setMemberResults([]);
-    setMemberResultsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/workspace/member/${targetUsername}/results`, { headers: h });
-      if (res.ok) {
-        const data = await res.json();
-        setMemberResults(data.items ?? []);
-      }
-    } catch { /* ignore */ }
-    finally { setMemberResultsLoading(false); }
   };
 
   const handlePromote = async (targetUsername: string) => {
@@ -365,7 +350,7 @@ export function Workspace() {
                         </button>
                         {/* Ver dados */}
                         <button
-                          onClick={() => handleViewData(m.username)}
+                          onClick={() => navigate(`/workspace/member/${m.username}`)}
                           title="Ver dados"
                           className="w-7 h-7 flex items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors"
                         >
@@ -405,92 +390,6 @@ export function Workspace() {
         )}
       </div>
 
-      {/* Member results panel */}
-      {selectedMember && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-green-400" />
-              <h3 className="text-sm font-semibold text-foreground">
-                Dados de <span className="text-green-400">{selectedMember}</span>
-              </h3>
-              {!memberResultsLoading && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-medium">
-                  {Math.min(memberResults.length, 50)} / {memberResults.length}
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => { setSelectedMember(null); setMemberResults([]); }}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
-              title="Fechar"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          {memberResultsLoading ? (
-            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">Carregando dados...</span>
-            </div>
-          ) : memberResults.length === 0 ? (
-            <div className="py-10 text-center">
-              <FolderClock className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">Nenhum arquivo encontrado para este membro.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nome</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Riscos</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Tamanho</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {memberResults.slice(0, 50).map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-4 py-3 max-w-xs">
-                        <p className="text-xs font-medium text-foreground truncate" title={item.nome ?? item.caminho}>
-                          {item.nome ?? item.caminho ?? "—"}
-                        </p>
-                        {item.caminho && item.nome && (
-                          <p className="text-[10px] text-muted-foreground truncate">{item.caminho}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          item.inativo === "SIM"
-                            ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                            : "bg-green-500/10 text-green-400 border border-green-500/20"
-                        }`}>
-                          {item.inativo === "SIM" ? "Inativo" : "Ativo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`text-xs ${
-                          item.riscos && item.riscos !== "NENHUM" && item.riscos !== ""
-                            ? "text-[#f85149]"
-                            : "text-muted-foreground"
-                        }`}>
-                          {item.riscos || "Nenhum"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right hidden lg:table-cell">
-                        <span className="text-xs text-muted-foreground">
-                          {item.tamanho_mb != null ? `${item.tamanho_mb} MB` : "—"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
