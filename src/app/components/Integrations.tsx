@@ -727,9 +727,40 @@ export function Integrations() {
         onToggle={() => setGworkspaceOpen(v => !v)}
       >
         <div className="space-y-4">
-          <div className="p-3 rounded-lg bg-[#34a853]/8 border border-[#34a853]/20 text-xs text-[#34a853] space-y-1">
-            <p className="font-semibold">Configuração no Google Cloud Console:</p>
-            <p className="text-[#34a853]/80">Crie uma Service Account com permissão de <strong>Domain-Wide Delegation</strong> e escopo <code className="bg-black/20 rounded px-1">drive.readonly</code>. Baixe a chave JSON e cole abaixo.</p>
+          {/* Tutorial */}
+          <div className="rounded-lg border border-[#34a853]/20 bg-[#34a853]/5 divide-y divide-[#34a853]/10 text-xs">
+            <div className="px-4 py-2.5 flex items-center gap-2">
+              <span className="font-semibold text-[#34a853]">Como configurar — passo a passo</span>
+            </div>
+            <div className="px-4 py-3 space-y-3 text-muted-foreground leading-relaxed">
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#34a853]/15 text-[#34a853] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                <p>Acesse o <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-[#34a853] underline underline-offset-2">Google Cloud Console</a>, crie ou selecione um projeto. Em <strong className="text-foreground">APIs &amp; Services → Library</strong>, busque <strong className="text-foreground">Google Drive API</strong> e clique em <strong className="text-foreground">Enable</strong>.</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#34a853]/15 text-[#34a853] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                <p>Vá em <strong className="text-foreground">IAM &amp; Admin → Service Accounts → Create Service Account</strong>. Dê um nome (ex: <code className="bg-black/20 rounded px-1">sentinel360</code>) e finalize a criação.</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#34a853]/15 text-[#34a853] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+                <p>Clique na service account criada → aba <strong className="text-foreground">Keys → Add Key → Create new key → JSON</strong>. Um arquivo <code className="bg-black/20 rounded px-1">.json</code> será baixado — é esse arquivo que você cola abaixo.</p>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#34a853]/15 text-[#34a853] font-bold flex items-center justify-center shrink-0 mt-0.5">4</span>
+                <div>
+                  <p>No <a href="https://admin.google.com" target="_blank" rel="noopener noreferrer" className="text-[#34a853] underline underline-offset-2">Google Workspace Admin Console</a>, vá em <strong className="text-foreground">Security → Access and data control → API controls → Manage Domain Wide Delegation</strong>.</p>
+                  <p className="mt-1.5">Clique em <strong className="text-foreground">Add new</strong> e preencha:</p>
+                  <ul className="mt-1 space-y-1 pl-2">
+                    <li>• <strong className="text-foreground">Client ID:</strong> o número que aparece nos detalhes da service account (campo "Unique ID")</li>
+                    <li>• <strong className="text-foreground">OAuth scopes:</strong> <code className="bg-black/20 rounded px-1">https://www.googleapis.com/auth/drive.readonly</code></li>
+                  </ul>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-5 h-5 rounded-full bg-[#34a853]/15 text-[#34a853] font-bold flex items-center justify-center shrink-0 mt-0.5">5</span>
+                <p>Abra o arquivo JSON baixado, copie todo o conteúdo e cole no campo abaixo. Clique em <strong className="text-foreground">Salvar credenciais</strong>.</p>
+              </div>
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Service Account JSON</label>
