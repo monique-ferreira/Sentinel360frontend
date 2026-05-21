@@ -8,6 +8,7 @@ import { Reports } from "./components/Reports";
 import { Profile } from "./components/Profile";
 import { Workspace } from "./components/Workspace";
 import { MemberData } from "./components/MemberData";
+import { Help } from "./components/Help";
 
 export const router = createBrowserRouter([
   {
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile },
       { path: "workspace", Component: Workspace },
       { path: "workspace/member/:username", Component: MemberData },
+      { path: "help", Component: Help },
     ],
   },
 ]);

@@ -3,23 +3,25 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
 import {
   LayoutDashboard, FolderClock, ShieldAlert,
   Zap, FileBarChart2, LogOut, User,
-  ChevronLeft, ChevronRight, Shield, Building2, Sun, Moon,
+  ChevronLeft, ChevronRight, Shield, Building2, Sun, Moon, HelpCircle,
 } from "lucide-react";
+import { OnboardingTour } from "./OnboardingTour";
 import { useAuth } from "../AuthContext";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 const BASE_NAV = [
-  { to: "/",               icon: LayoutDashboard, label: "Dashboard",         end: true  },
-  { to: "/inactive-files", icon: FolderClock,     label: "Arquivos Inativos", end: false },
-  { to: "/sensitive-data", icon: ShieldAlert,     label: "Dados Sensíveis",   end: false },
-  { to: "/integrations",   icon: Zap,             label: "Integrações",       end: false },
-  { to: "/reports",        icon: FileBarChart2,   label: "Relatórios",        end: false },
-  { to: "/profile",        icon: User,            label: "Perfil",            end: false },
+  { to: "/",               icon: LayoutDashboard, label: "Dashboard",         end: true,  tour: "nav-dashboard"    },
+  { to: "/inactive-files", icon: FolderClock,     label: "Arquivos Inativos", end: false, tour: "nav-inactive"     },
+  { to: "/sensitive-data", icon: ShieldAlert,     label: "Dados Sensíveis",   end: false, tour: "nav-sensitive"    },
+  { to: "/integrations",   icon: Zap,             label: "Integrações",       end: false, tour: "nav-integrations" },
+  { to: "/reports",        icon: FileBarChart2,   label: "Relatórios",        end: false, tour: "nav-reports"      },
+  { to: "/profile",        icon: User,            label: "Perfil",            end: false, tour: "nav-profile"      },
 ];
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [showTour, setShowTour] = useState(() => !localStorage.getItem("s360_tour_done"));
   const [theme, setTheme] = useState<"dark" | "light">(() =>
     (localStorage.getItem("s360_theme") as "dark" | "light") ?? "dark"
   );
@@ -54,7 +56,7 @@ export function Layout() {
 
   const NAV = (() => {
     let nav = isAdmin
-      ? [...BASE_NAV, { to: "/workspace", icon: Building2, label: "Workspace", end: false }]
+      ? [...BASE_NAV, { to: "/workspace", icon: Building2, label: "Workspace", end: false, tour: undefined }]
       : BASE_NAV;
     if (isMember) {
       nav = nav.filter(n => n.to !== "/reports" && n.to !== "/sensitive-data");
@@ -74,6 +76,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      {showTour && <OnboardingTour onClose={() => setShowTour(false)} />}
       {/* Sidebar */}
       <aside className={`${collapsed ? "w-16" : "w-56"} flex flex-col bg-card border-r border-border transition-all duration-200 shrink-0 relative z-20`}>
 
@@ -92,9 +95,10 @@ export function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ to, icon: Icon, label, end }) => (
+          {NAV.map(({ to, icon: Icon, label, end, tour }) => (
             <NavLink
               key={to} to={to} end={end}
+              data-tour={tour}
               title={collapsed ? label : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-2.5 py-2 rounded-md text-sm transition-colors ${collapsed ? "justify-center" : ""} ${
@@ -164,13 +168,22 @@ export function Layout() {
             <h1 className="text-sm font-semibold text-foreground">{pageTitle}</h1>
             <p className="text-xs text-muted-foreground">Sentinel360 — Cyber Defense Platform</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
+              data-tour="theme-toggle"
               onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
               title={theme === "dark" ? "Modo claro" : "Modo escuro"}
               className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
               {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <button
+              data-tour="help-btn"
+              onClick={() => navigate("/help")}
+              title="Ajuda e documentação"
+              className="w-8 h-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            >
+              <HelpCircle className="w-4 h-4" />
             </button>
           </div>
         </header>
