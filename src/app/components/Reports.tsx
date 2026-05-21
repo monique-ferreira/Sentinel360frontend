@@ -27,6 +27,7 @@ export function Reports() {
   const [deleteError, setDeleteError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("todos");
   const [riskFilter, setRiskFilter] = useState<"todos" | "com_risco" | "sem_risco">("todos");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "gdrive" | "onedrive">("all");
   const [threshold, setThreshold] = useState(180);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -92,8 +93,14 @@ export function Reports() {
         (i.riscos || i.Riscos || "").toLowerCase().includes(q)
       );
     }
+    if (sourceFilter !== "all") {
+      result = result.filter(i => {
+        const o = (i.origem || "").toLowerCase();
+        return sourceFilter === "gdrive" ? o.includes("google") : o.includes("onedrive") || o.includes("sharepoint");
+      });
+    }
     setFiltered(result);
-  }, [search, statusFilter, riskFilter, items, threshold, dateFrom, dateTo]);
+  }, [search, statusFilter, riskFilter, sourceFilter, items, threshold, dateFrom, dateTo]);
 
   const handleDelete = async () => {
     if (!confirmItem) return;
@@ -116,8 +123,8 @@ export function Reports() {
     finally { setDeleting(null); }
   };
 
-  const clearFilters = () => { setSearch(""); setStatusFilter("todos"); setRiskFilter("todos"); setDateFrom(""); setDateTo(""); };
-  const hasFilters = search || statusFilter !== "todos" || riskFilter !== "todos" || dateFrom || dateTo;
+  const clearFilters = () => { setSearch(""); setStatusFilter("todos"); setRiskFilter("todos"); setSourceFilter("all"); setDateFrom(""); setDateTo(""); };
+  const hasFilters = search || statusFilter !== "todos" || riskFilter !== "todos" || sourceFilter !== "all" || dateFrom || dateTo;
 
   const chipBtn = (active: boolean) =>
     `px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer ${
@@ -229,6 +236,22 @@ export function Reports() {
             <button onClick={() => setRiskFilter("todos")}     className={chipBtn(riskFilter === "todos")}>Todos</button>
             <button onClick={() => setRiskFilter("com_risco")} className={chipBtn(riskFilter === "com_risco")}>Com risco</button>
             <button onClick={() => setRiskFilter("sem_risco")} className={chipBtn(riskFilter === "sem_risco")}>Sem risco</button>
+            <div className="w-px h-4 bg-border mx-1" />
+            <span className="text-xs text-muted-foreground mr-1">Origem:</span>
+            {(["all", "onedrive", "gdrive"] as const).map(s => {
+              const labels = { all: "Todos", onedrive: "OneDrive", gdrive: "Google Drive" };
+              const colors = { all: "#7d8590", onedrive: "#58a6ff", gdrive: "#f0883e" };
+              const active = sourceFilter === s;
+              return (
+                <button key={s} onClick={() => setSourceFilter(s)}
+                  className="px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer"
+                  style={active
+                    ? { borderColor: colors[s] + "40", background: colors[s] + "18", color: colors[s] }
+                    : {}}>
+                  {labels[s]}
+                </button>
+              );
+            })}
           </div>
 
           {/* Date range filter */}
