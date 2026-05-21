@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   User, Building2, CheckCircle2, Clock, Loader2, AlertCircle,
-  Save, Mail, Shield, Users,
+  Save, Mail, Shield, Users, Key, ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 import { NavLink } from "react-router";
@@ -22,19 +22,33 @@ export function Profile() {
   const [inactivityDays, setInactivityDays] = useState(180);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveMsg, setSaveMsg] = useState("");
+  // VirusTotal
+  const [vtKey, setVtKey] = useState("");
+  const [vtConfigured, setVtConfigured] = useState(false);
+  const [vtMasked, setVtMasked] = useState("");
+  const [vtStatus, setVtStatus] = useState<SaveStatus>("idle");
+  const [vtMsg, setVtMsg] = useState("");
 
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   const load = async () => {
     setLoading(true); setError("");
     try {
-      const res = await fetch(`${API_URL}/user/me`, { headers: h });
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json();
+      const [meRes, settingsRes] = await Promise.all([
+        fetch(`${API_URL}/user/me`, { headers: h }),
+        fetch(`${API_URL}/user/settings`, { headers: h }),
+      ]);
+      if (!meRes.ok) throw new Error(`Erro ${meRes.status}`);
+      const data = await meRes.json();
       setProfile(data);
       setFullName(data.full_name ?? "");
       setEmail(data.email ?? "");
       setInactivityDays(data.inactivity_days ?? 180);
+      if (settingsRes.ok) {
+        const s = await settingsRes.json();
+        setVtConfigured(s.vt_api_key_configured ?? false);
+        setVtMasked(s.vt_api_key_masked ?? "");
+      }
     } catch (e: any) {
       setError(e.message ?? "Erro ao carregar perfil.");
     } finally { setLoading(false); }
@@ -69,6 +83,24 @@ export function Profile() {
       setSaveMsg("Erro de conexão.");
     }
     setTimeout(() => setSaveStatus("idle"), 3000);
+  };
+
+  const saveVtKey = async () => {
+    if (!vtKey.trim()) return;
+    setVtStatus("saving"); setVtMsg("");
+    try {
+      const res = await fetch(`${API_URL}/user/settings`, {
+        method: "PUT",
+        headers: h,
+        body: JSON.stringify({ vt_api_key: vtKey.trim() }),
+      });
+      if (!res.ok) { const d = await res.json(); setVtStatus("error"); setVtMsg(d.detail ?? "Erro ao salvar."); return; }
+      setVtStatus("ok"); setVtMsg("Chave salva com sucesso.");
+      setVtConfigured(true);
+      setVtMasked("*".repeat(Math.max(0, vtKey.length - 4)) + vtKey.slice(-4));
+      setVtKey("");
+    } catch { setVtStatus("error"); setVtMsg("Erro de conexão."); }
+    setTimeout(() => setVtStatus("idle"), 3000);
   };
 
   const inputCls = "w-full h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-colors disabled:opacity-50";
@@ -237,6 +269,62 @@ export function Profile() {
             : <><Save className="h-4 w-4" />Salvar alterações</>}
         </button>
       </form>
+
+      {/* VirusTotal */}
+      <div className="rounded-xl border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#394eff]/10 border border-[#394eff]/20 flex items-center justify-center shrink-0">
+            <Key className="w-4 h-4 text-[#394eff]" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">VirusTotal API</p>
+            <p className="text-xs text-muted-foreground">Análise de arquivos contra +70 engines de antivírus</p>
+          </div>
+          {vtConfigured && (
+            <span className="ml-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#3fb950]/10 border border-[#3fb950]/20 text-[#3fb950]">
+              <CheckCircle2 className="w-3 h-3" /> Configurado
+            </span>
+          )}
+        </div>
+
+        {vtConfigured && vtMasked && (
+          <div className="text-xs text-muted-foreground bg-secondary/50 rounded-lg px-3 py-2 font-mono">
+            Chave atual: {vtMasked}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <label className="block text-xs font-medium text-muted-foreground">
+            {vtConfigured ? "Nova chave (substituir)" : "Chave de API"}
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={vtKey}
+              onChange={e => setVtKey(e.target.value)}
+              placeholder="Cole aqui sua chave do VirusTotal"
+              className="flex-1 h-9 px-3 rounded-lg border border-border bg-secondary text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-[#394eff]/30 focus:border-[#394eff]/50 transition-colors"
+            />
+            <button onClick={saveVtKey} disabled={!vtKey.trim() || vtStatus === "saving"}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#394eff]/10 border border-[#394eff]/30 text-[#394eff] text-xs font-medium hover:bg-[#394eff]/20 disabled:opacity-40 transition-colors">
+              {vtStatus === "saving" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Salvar
+            </button>
+          </div>
+        </div>
+
+        {vtStatus === "ok" && <p className="text-xs text-[#3fb950] flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" />{vtMsg}</p>}
+        {vtStatus === "error" && <p className="text-xs text-destructive flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" />{vtMsg}</p>}
+
+        <p className="text-xs text-muted-foreground/60">
+          Obtenha sua chave gratuita em{" "}
+          <a href="https://www.virustotal.com/gui/my-apikey" target="_blank" rel="noreferrer"
+            className="text-[#394eff] hover:underline inline-flex items-center gap-0.5">
+            virustotal.com/gui/my-apikey <ExternalLink className="w-3 h-3" />
+          </a>
+          {" "}· Plano gratuito: 4 req/min, 500/dia
+        </p>
+      </div>
     </div>
   );
 }
