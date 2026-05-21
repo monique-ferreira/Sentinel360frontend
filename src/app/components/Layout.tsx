@@ -35,10 +35,23 @@ export function Layout() {
   }, [token]);
 
   const isAdmin = userProfile?.org_role === "admin" && userProfile?.account_type === "corporate";
+  const isMember = userProfile?.account_type === "corporate" && userProfile?.org_role !== "admin" && userProfile?.org_status === "approved";
 
-  const NAV = isAdmin
-    ? [...BASE_NAV, { to: "/workspace", icon: Building2, label: "Workspace", end: false }]
-    : BASE_NAV;
+  const NAV = (() => {
+    let nav = isAdmin
+      ? [...BASE_NAV, { to: "/workspace", icon: Building2, label: "Workspace", end: false }]
+      : BASE_NAV;
+    if (isMember) {
+      nav = nav.filter(n => n.to !== "/reports" && n.to !== "/sensitive-data");
+    }
+    return nav;
+  })();
+
+  useEffect(() => {
+    if (isMember && (location.pathname === "/reports" || location.pathname === "/sensitive-data")) {
+      navigate("/");
+    }
+  }, [isMember, location.pathname]);
 
   const pageTitle = NAV.find(n =>
     n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)

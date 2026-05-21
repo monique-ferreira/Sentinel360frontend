@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Building2, Users, CheckCircle2, XCircle, RefreshCw,
   AlertCircle, Loader2, ShieldAlert, FolderClock, HardDrive,
+  Zap, Eye, ShieldCheck, Download, X,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
@@ -15,6 +16,11 @@ export function Workspace() {
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState("");
+
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
+  const [memberResults, setMemberResults] = useState<any[]>([]);
+  const [memberResultsLoading, setMemberResultsLoading] = useState(false);
+  const [scanning, setScanning] = useState<string | null>(null);
 
   const h = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -54,10 +60,103 @@ export function Workspace() {
       if (res.ok) {
         setRequests(r => r.filter(req => req.username !== username));
         setActionMsg(`${username} ${action === "approve" ? "aprovado" : "rejeitado"} com sucesso.`);
-        if (action === "approve") load(); // Reload workspace to show new member
+        if (action === "approve") load();
       }
     } catch { /* ignore */ }
     finally { setActionLoading(null); setTimeout(() => setActionMsg(""), 3000); }
+  };
+
+  const handleScan = async (targetUsername: string) => {
+    setScanning(targetUsername);
+    setActionMsg("");
+    try {
+      const res = await fetch(`${API_URL}/workspace/member/${targetUsername}/scan`, {
+        method: "POST",
+        headers: h,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMsg(data.message ?? `Scan iniciado para ${targetUsername}.`);
+      } else {
+        setActionMsg(data.detail ?? "Erro ao iniciar scan.");
+      }
+    } catch {
+      setActionMsg("Erro ao iniciar scan.");
+    } finally {
+      setScanning(null);
+      setTimeout(() => setActionMsg(""), 4000);
+    }
+  };
+
+  const handleViewData = async (targetUsername: string) => {
+    setSelectedMember(targetUsername);
+    setMemberResults([]);
+    setMemberResultsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/workspace/member/${targetUsername}/results`, { headers: h });
+      if (res.ok) {
+        const data = await res.json();
+        setMemberResults(data.items ?? []);
+      }
+    } catch { /* ignore */ }
+    finally { setMemberResultsLoading(false); }
+  };
+
+  const handlePromote = async (targetUsername: string) => {
+    if (!confirm(`Promover ${targetUsername} a administrador?`)) return;
+    setActionLoading("promote_" + targetUsername);
+    try {
+      const res = await fetch(`${API_URL}/orgs/members/${targetUsername}/promote`, {
+        method: "POST",
+        headers: h,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setActionMsg(data.message ?? `${targetUsername} promovido.`);
+        load();
+      } else {
+        setActionMsg(data.detail ?? "Erro ao promover.");
+      }
+    } catch {
+      setActionMsg("Erro ao promover.");
+    } finally {
+      setActionLoading(null);
+      setTimeout(() => setActionMsg(""), 4000);
+    }
+  };
+
+  const handleBiDownload = async (targetUsername?: string) => {
+    const key = targetUsername ? "bi_" + targetUsername : "bi_geral";
+    setActionLoading(key);
+    try {
+      const url = targetUsername
+        ? `${API_URL}/workspace/bi-report?target_username=${encodeURIComponent(targetUsername)}`
+        : `${API_URL}/workspace/bi-report`;
+      const res = await fetch(url, { headers: h });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setActionMsg(data.detail ?? "Erro ao exportar BI.");
+        setTimeout(() => setActionMsg(""), 4000);
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : `sentinel360_bi_${targetUsername ?? "geral"}.xlsx`;
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objUrl);
+    } catch {
+      setActionMsg("Erro ao exportar BI.");
+      setTimeout(() => setActionMsg(""), 4000);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   if (loading) {
@@ -81,7 +180,7 @@ export function Workspace() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Building2 className="h-5 w-5 text-[#bc8cff]" />
@@ -91,11 +190,23 @@ export function Workspace() {
             Gerenciamento de membros e dados da organização
           </p>
         </div>
-        <button onClick={load} disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          Atualizar
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => handleBiDownload()}
+            disabled={actionLoading === "bi_geral"}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 disabled:opacity-40 transition-colors"
+          >
+            {actionLoading === "bi_geral"
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Download className="h-3.5 w-3.5" />}
+            Exportar BI Geral
+          </button>
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-white/5 disabled:opacity-40 transition-colors">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       {actionMsg && (
@@ -184,7 +295,6 @@ export function Workspace() {
               <thead>
                 <tr className="border-b border-border">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Usuário</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Email</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Papel</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     <span className="flex items-center justify-end gap-1"><FolderClock className="h-3.5 w-3.5" />Inativos</span>
@@ -196,6 +306,7 @@ export function Workspace() {
                     <span className="flex items-center justify-end gap-1"><HardDrive className="h-3.5 w-3.5" />Storage</span>
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -213,9 +324,6 @@ export function Workspace() {
                           {m.full_name && <p className="text-xs text-muted-foreground">{m.full_name}</p>}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
-                      {m.email || "—"}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -242,6 +350,53 @@ export function Workspace() {
                     <td className="px-4 py-3 text-right">
                       <span className="text-xs font-medium text-foreground">{m.total_files}</span>
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {/* Scan */}
+                        <button
+                          onClick={() => handleScan(m.username)}
+                          disabled={scanning === m.username}
+                          title="Iniciar scan"
+                          className="w-7 h-7 flex items-center justify-center rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 disabled:opacity-50 transition-colors"
+                        >
+                          {scanning === m.username
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Zap className="h-3.5 w-3.5" />}
+                        </button>
+                        {/* Ver dados */}
+                        <button
+                          onClick={() => handleViewData(m.username)}
+                          title="Ver dados"
+                          className="w-7 h-7 flex items-center justify-center rounded-md bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 transition-colors"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
+                        {/* Promover admin */}
+                        {m.org_role !== "admin" && (
+                          <button
+                            onClick={() => handlePromote(m.username)}
+                            disabled={actionLoading === "promote_" + m.username}
+                            title="Promover a admin"
+                            className="w-7 h-7 flex items-center justify-center rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 disabled:opacity-50 transition-colors"
+                          >
+                            {actionLoading === "promote_" + m.username
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <ShieldCheck className="h-3.5 w-3.5" />}
+                          </button>
+                        )}
+                        {/* BI download */}
+                        <button
+                          onClick={() => handleBiDownload(m.username)}
+                          disabled={actionLoading === "bi_" + m.username}
+                          title="Exportar BI"
+                          className="w-7 h-7 flex items-center justify-center rounded-md bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-500/20 disabled:opacity-50 transition-colors"
+                        >
+                          {actionLoading === "bi_" + m.username
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Download className="h-3.5 w-3.5" />}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -249,6 +404,93 @@ export function Workspace() {
           </div>
         )}
       </div>
+
+      {/* Member results panel */}
+      {selectedMember && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-green-400" />
+              <h3 className="text-sm font-semibold text-foreground">
+                Dados de <span className="text-green-400">{selectedMember}</span>
+              </h3>
+              {!memberResultsLoading && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-medium">
+                  {Math.min(memberResults.length, 50)} / {memberResults.length}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => { setSelectedMember(null); setMemberResults([]); }}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors"
+              title="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {memberResultsLoading ? (
+            <div className="flex items-center justify-center py-12 gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Carregando dados...</span>
+            </div>
+          ) : memberResults.length === 0 ? (
+            <div className="py-10 text-center">
+              <FolderClock className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">Nenhum arquivo encontrado para este membro.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nome</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Riscos</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Tamanho</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {memberResults.slice(0, 50).map((item: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3 max-w-xs">
+                        <p className="text-xs font-medium text-foreground truncate" title={item.nome ?? item.caminho}>
+                          {item.nome ?? item.caminho ?? "—"}
+                        </p>
+                        {item.caminho && item.nome && (
+                          <p className="text-[10px] text-muted-foreground truncate">{item.caminho}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          item.inativo === "SIM"
+                            ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                            : "bg-green-500/10 text-green-400 border border-green-500/20"
+                        }`}>
+                          {item.inativo === "SIM" ? "Inativo" : "Ativo"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className={`text-xs ${
+                          item.riscos && item.riscos !== "NENHUM" && item.riscos !== ""
+                            ? "text-[#f85149]"
+                            : "text-muted-foreground"
+                        }`}>
+                          {item.riscos || "Nenhum"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right hidden lg:table-cell">
+                        <span className="text-xs text-muted-foreground">
+                          {item.tamanho_mb != null ? `${item.tamanho_mb} MB` : "—"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
