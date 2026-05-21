@@ -3,6 +3,19 @@ import { RefreshCw, WifiOff, FolderClock, Search, FolderOpen, Clock } from "luci
 import { useAuth } from "../AuthContext";
 import { FileViewerModal } from "./FileViewerModal";
 
+function OrigemTag({ origem }: { origem?: string }) {
+  if (!origem) return <span className="text-xs text-muted-foreground">—</span>;
+  const isGdrive    = origem.toLowerCase().includes("google");
+  const isOneDrive  = origem.toLowerCase().includes("onedrive") || origem.toLowerCase().includes("sharepoint");
+  const color = isGdrive ? "#ea4335" : isOneDrive ? "#58a6ff" : "#7d8590";
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
+      style={{ color, borderColor: color + "40", background: color + "15" }}>
+      {origem.length > 22 ? origem.slice(0, 20) + "…" : origem}
+    </span>
+  );
+}
+
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 export function InactiveFiles() {
@@ -196,6 +209,7 @@ export function InactiveFiles() {
             <thead>
               <tr className="border-b border-border">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Arquivo</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Origem</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Caminho</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Dias sem acesso</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Último acesso</th>
@@ -223,6 +237,9 @@ export function InactiveFiles() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <OrigemTag origem={item.origem} />
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs truncate max-w-[260px] hidden md:table-cell">
                       <a href={item.caminho || item.Caminho || "#"} target="_blank" rel="noreferrer"

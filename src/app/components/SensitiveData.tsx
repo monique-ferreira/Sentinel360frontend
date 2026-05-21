@@ -3,6 +3,19 @@ import { RefreshCw, WifiOff, ShieldAlert, Search, ShieldOff } from "lucide-react
 import { useAuth } from "../AuthContext";
 import { FileViewerModal } from "./FileViewerModal";
 
+function OrigemTag({ origem }: { origem?: string }) {
+  if (!origem) return <span className="text-xs text-muted-foreground">—</span>;
+  const isGdrive   = origem.toLowerCase().includes("google");
+  const isOneDrive = origem.toLowerCase().includes("onedrive") || origem.toLowerCase().includes("sharepoint");
+  const color = isGdrive ? "#ea4335" : isOneDrive ? "#58a6ff" : "#7d8590";
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border"
+      style={{ color, borderColor: color + "40", background: color + "15" }}>
+      {origem.length > 22 ? origem.slice(0, 20) + "…" : origem}
+    </span>
+  );
+}
+
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
 
 interface RiskConfig { color: string; bg: string; border: string; }
@@ -173,6 +186,7 @@ export function SensitiveData() {
               <tr className="border-b border-border">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Arquivo</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">Risco</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Origem</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Caminho</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden lg:table-cell">Data</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tam.</th>
@@ -201,6 +215,7 @@ export function SensitiveData() {
                       </div>
                     </td>
                     <td className="px-4 py-3"><RiskBadge risk={r} /></td>
+                    <td className="px-4 py-3 hidden sm:table-cell"><OrigemTag origem={item.origem} /></td>
                     <td className="px-4 py-3 text-muted-foreground text-xs truncate max-w-[240px] hidden md:table-cell">
                       {item.caminho || item.Caminho || item.path}
                     </td>

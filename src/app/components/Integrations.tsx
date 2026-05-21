@@ -678,7 +678,7 @@ export function Integrations() {
       {!isCorporate && <IntegrationCard
         ref={gdriveCardRef}
         title="Google Drive Pessoal"
-        subtitle="OAuth — Meu Drive"
+        subtitle="Meu Drive pessoal"
         icon={<Cloud className="w-4 h-4" />}
         color="#ea4335"
         open={gdriveOpen}
