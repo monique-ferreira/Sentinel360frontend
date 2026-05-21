@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   User, Building2, CheckCircle2, Clock, Loader2, AlertCircle,
-  Save, Mail, Shield, Users,
+  Save, Mail, Shield, Users, CalendarClock,
 } from "lucide-react";
 import { useAuth } from "../AuthContext";
 import { NavLink } from "react-router";
@@ -20,6 +20,8 @@ export function Profile() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [inactivityDays, setInactivityDays] = useState(180);
+  const [autoScanInterval, setAutoScanInterval] = useState("never");
+  const [lastAutoScan, setLastAutoScan] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveMsg, setSaveMsg] = useState("");
 
@@ -35,6 +37,8 @@ export function Profile() {
       setFullName(data.full_name ?? "");
       setEmail(data.email ?? "");
       setInactivityDays(data.inactivity_days ?? 180);
+      setAutoScanInterval(data.auto_scan_interval ?? "never");
+      setLastAutoScan(data.last_auto_scan ?? null);
     } catch (e: any) {
       setError(e.message ?? "Erro ao carregar perfil.");
     } finally { setLoading(false); }
@@ -50,9 +54,10 @@ export function Profile() {
         method: "PUT",
         headers: h,
         body: JSON.stringify({
-          full_name:       fullName.trim() || undefined,
-          email:           email.trim() || undefined,
-          inactivity_days: inactivityDays,
+          full_name:           fullName.trim() || undefined,
+          email:               email.trim() || undefined,
+          inactivity_days:     inactivityDays,
+          auto_scan_interval:  autoScanInterval,
         }),
       });
       const data = await res.json();
@@ -63,7 +68,7 @@ export function Profile() {
       }
       setSaveStatus("ok");
       setSaveMsg("Perfil atualizado com sucesso.");
-      setProfile((p: any) => ({ ...p, full_name: fullName, email, inactivity_days: inactivityDays }));
+      setProfile((p: any) => ({ ...p, full_name: fullName, email, inactivity_days: inactivityDays, auto_scan_interval: autoScanInterval }));
     } catch {
       setSaveStatus("error");
       setSaveMsg("Erro de conexão.");
@@ -217,6 +222,33 @@ export function Profile() {
             />
             <span className="text-xs text-muted-foreground">dias sem acesso = arquivo inativo</span>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+            <span className="flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5" /> Varredura automática</span>
+          </label>
+          <select
+            className="h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-colors disabled:opacity-50"
+            value={autoScanInterval}
+            onChange={e => setAutoScanInterval(e.target.value)}
+            disabled={saveStatus === "saving"}
+          >
+            <option value="never">Desativada</option>
+            <option value="daily">Diária (a cada 24h)</option>
+            <option value="weekly">Semanal (a cada 7 dias)</option>
+            <option value="monthly">Mensal (a cada 30 dias)</option>
+          </select>
+          {lastAutoScan && autoScanInterval !== "never" && (
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Último scan automático: {new Date(lastAutoScan).toLocaleString("pt-BR")}
+            </p>
+          )}
+          {autoScanInterval !== "never" && (
+            <p className="text-xs text-primary/80 mt-1">
+              O Sentinel360 vai varrer seus arquivos automaticamente sem precisar de ação manual.
+            </p>
+          )}
         </div>
 
         {saveStatus === "ok" && (
