@@ -15,7 +15,7 @@ type OrgAction = "create" | "join";
 const features = [
   { icon: <FileSearch className="w-5 h-5" />, label: "Varredura automatizada de arquivos inativos" },
   { icon: <Lock className="w-5 h-5" />, label: "Detecção de credenciais e dados sensíveis" },
-  { icon: <Users className="w-5 h-5" />, label: "Integração com Microsoft 365 e Azure AD" },
+  { icon: <Users className="w-5 h-5" />, label: "Integração com Microsoft 365, Azure AD e Google Drive" },
   { icon: <BarChart3 className="w-5 h-5" />, label: "Relatórios e dashboards em tempo real" },
 ];
 

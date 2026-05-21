@@ -75,25 +75,33 @@ const SECTIONS: Section[] = [
     id: "integrations",
     icon: Zap,
     title: "Integrações",
-    summary: "Conecte suas contas Microsoft para habilitar as varreduras.",
+    summary: "Conecte suas contas Microsoft e Google para habilitar as varreduras.",
     content: (
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
-        <p>O Sentinel360 se integra ao Microsoft Graph API para acessar seus arquivos. Conecte a conta adequada para o tipo da sua conta:</p>
+        <p>O Sentinel360 se integra ao Microsoft Graph API e Google Drive API para acessar seus arquivos. Conecte a conta adequada para o tipo da sua conta:</p>
         <div className="space-y-2">
           <div className="bg-secondary/40 rounded-lg p-3">
             <p className="text-xs font-semibold text-foreground mb-1">Conta Pessoal — Microsoft Pessoal</p>
-            <p className="text-xs">Conecte sua conta Microsoft pessoal (Outlook, OneDrive) para analisar seus arquivos pessoais.</p>
+            <p className="text-xs">Conecte sua conta Microsoft pessoal (Outlook, OneDrive) via OAuth para analisar seus arquivos pessoais.</p>
+          </div>
+          <div className="bg-secondary/40 rounded-lg p-3">
+            <p className="text-xs font-semibold text-foreground mb-1">Conta Pessoal — Google Drive Pessoal</p>
+            <p className="text-xs">Conecte sua conta Google via OAuth para analisar arquivos do Meu Drive. Requer permissão <code className="bg-black/20 rounded px-1">drive.readonly</code> no Google Cloud Console.</p>
           </div>
           <div className="bg-secondary/40 rounded-lg p-3">
             <p className="text-xs font-semibold text-foreground mb-1">Conta Corporativa — Microsoft 365</p>
-            <p className="text-xs">Conecte o tenant da organização para analisar arquivos do SharePoint e OneDrive for Business.</p>
+            <p className="text-xs">Conecte o tenant da organização (Tenant ID + Client ID + Secret) para analisar arquivos do SharePoint e OneDrive for Business.</p>
           </div>
           <div className="bg-secondary/40 rounded-lg p-3">
             <p className="text-xs font-semibold text-foreground mb-1">Conta Corporativa — Azure AD</p>
             <p className="text-xs">Integração com diretório para gestão de usuários e controle de acesso por grupo.</p>
           </div>
+          <div className="bg-secondary/40 rounded-lg p-3">
+            <p className="text-xs font-semibold text-foreground mb-1">Conta Corporativa — Google Workspace</p>
+            <p className="text-xs">Configure uma Service Account com Domain-Wide Delegation para varrer os Shared Drives da organização. Cole o JSON da chave diretamente na integração — há um tutorial passo a passo dentro do card.</p>
+          </div>
         </div>
-        <p>Após conectar, clique em <strong className="text-foreground">Iniciar Varredura</strong> para disparar a primeira análise.</p>
+        <p>Após conectar, clique em <strong className="text-foreground">Varrer arquivos</strong> para disparar a primeira análise.</p>
       </div>
     ),
   },
@@ -197,11 +205,11 @@ const SECTIONS: Section[] = [
       <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
         <p>O fluxo de varredura do Sentinel360:</p>
         <ol className="list-decimal list-inside space-y-2 pl-2">
-          <li><strong className="text-foreground">Autenticação</strong> — o Sentinel360 obtém um token OAuth2 via Microsoft Graph API.</li>
-          <li><strong className="text-foreground">Listagem</strong> — todos os arquivos do OneDrive / SharePoint são listados com metadados (nome, tamanho, data de acesso, hash).</li>
-          <li><strong className="text-foreground">Análise de conteúdo</strong> — até 8KB de cada arquivo são baixados e analisados em busca de padrões sensíveis com expressões regulares.</li>
+          <li><strong className="text-foreground">Autenticação</strong> — o Sentinel360 obtém um token OAuth2 via Microsoft Graph API ou Google Drive API (conforme a integração conectada).</li>
+          <li><strong className="text-foreground">Listagem</strong> — todos os arquivos do OneDrive, SharePoint ou Google Drive são listados com metadados (nome, tamanho, data de acesso, hash).</li>
+          <li><strong className="text-foreground">Análise de conteúdo</strong> — até 8KB de cada arquivo de texto são baixados e analisados em busca de padrões sensíveis com expressões regulares.</li>
           <li><strong className="text-foreground">Classificação</strong> — cada arquivo recebe categorias de risco (CPF, senha, etc.) ou "NENHUM".</li>
-          <li><strong className="text-foreground">Armazenamento</strong> — resultados são salvos no banco de dados para consultas futuras e geração de relatórios.</li>
+          <li><strong className="text-foreground">Armazenamento</strong> — resultados são salvos no banco de dados, identificados pela origem (OneDrive, SharePoint, Google Drive), para consultas futuras e relatórios.</li>
         </ol>
       </div>
     ),
