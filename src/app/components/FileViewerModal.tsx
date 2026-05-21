@@ -59,8 +59,14 @@ function PdfViewer({ data }: { data: string }) {
   );
 }
 
+const OFFICE_EXT = new Set([".docx", ".doc", ".pptx", ".ppt", ".xlsx", ".xls", ".odt", ".odp", ".ods"]);
+
 interface Props {
-  item: { nome?: string; Arquivo?: string; name?: string; caminho?: string; Caminho?: string; path?: string } | null;
+  item: {
+    nome?: string; Arquivo?: string; name?: string;
+    caminho?: string; Caminho?: string; path?: string;
+    graph_drive_id?: string; gdrive_file_id?: string;
+  } | null;
   onClose: () => void;
   targetUsername?: string;
 }
@@ -82,11 +88,22 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
   const nome = item?.nome || item?.Arquivo || item?.name || "Arquivo";
   const path = item?.caminho || item?.Caminho || item?.path || "";
   const qs = targetUsername ? `&target_username=${encodeURIComponent(targetUsername)}` : "";
+  const ext = nome.includes(".") ? "." + nome.split(".").pop()!.toLowerCase() : "";
+  const isOffice = OFFICE_EXT.has(ext);
+  const isGdrive = item?.graph_drive_id === "gdrive";
+
+  // Native viewer URL for Office formats
+  const nativeViewerUrl = isOffice
+    ? isGdrive && item?.gdrive_file_id
+      ? `https://drive.google.com/file/d/${item.gdrive_file_id}/preview`
+      : path  // OneDrive: open the webUrl directly in iframe
+    : null;
 
   useEffect(() => {
     if (!item) return;
     setContent(""); setBinaryData(null); setError(""); setTruncated(false);
     setVtStatus("idle"); setVtData(null); setVtError("");
+    if (isOffice) return; // handled by native viewer
     setLoading(true);
     fetch(`${API_URL}/file-preview?path=${encodeURIComponent(path)}${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -228,6 +245,15 @@ export function FileViewerModal({ item, onClose, targetUsername }: Props) {
 
         {/* file content */}
         <div className="flex-1 overflow-auto p-5">
+          {nativeViewerUrl && (
+            <iframe
+              src={nativeViewerUrl}
+              className="w-full rounded-xl border border-border"
+              style={{ height: "65vh" }}
+              title={nome}
+              allow="autoplay"
+            />
+          )}
           {loading && (
             <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
               <RefreshCw className="w-5 h-5 animate-spin" />
