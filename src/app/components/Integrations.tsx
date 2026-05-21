@@ -512,7 +512,7 @@ export function Integrations() {
       {/* Conta pessoal Microsoft — oculto para contas corporativas */}
       {!isCorporate && <IntegrationCard
         ref={personalCardRef}
-        title="Conta Microsoft Pessoal"
+        title="OneDrive Pessoal"
         subtitle="OneDrive, arquivos e documentos pessoais"
         icon={<UserCircle className="w-4 h-4" />}
         color="#3fb950"

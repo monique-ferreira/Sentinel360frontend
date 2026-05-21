@@ -81,7 +81,7 @@ const SECTIONS: Section[] = [
         <p>O Sentinel360 se integra ao Microsoft Graph API e Google Drive API para acessar seus arquivos. Conecte a conta adequada para o tipo da sua conta:</p>
         <div className="space-y-2">
           <div className="bg-secondary/40 rounded-lg p-3">
-            <p className="text-xs font-semibold text-foreground mb-1">Conta Pessoal — Microsoft Pessoal</p>
+            <p className="text-xs font-semibold text-foreground mb-1">Conta Pessoal — OneDrive Pessoal</p>
             <p className="text-xs">Conecte sua conta Microsoft pessoal (Outlook, OneDrive) via OAuth para analisar seus arquivos pessoais.</p>
           </div>
           <div className="bg-secondary/40 rounded-lg p-3">
