@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Eye, EyeOff, Shield, AlertCircle, Loader2,
   CheckCircle2, Lock, Users, FileSearch, BarChart3,
-  User, Building2, ArrowLeft, Search,
+  User, Building2, ArrowLeft, Search, Sun, Moon,
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "https://sentinel360.onrender.com";
@@ -21,6 +21,16 @@ const features = [
 
 export function Login({ onLogin }: { onLogin: (token: string) => void }) {
   const [view, setView] = useState<View>("login");
+  const [theme, setTheme] = useState<"dark" | "light">(() =>
+    (localStorage.getItem("s360_theme") as "dark" | "light") ?? "dark"
+  );
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "light") { root.classList.add("light"); root.classList.remove("dark"); }
+    else { root.classList.remove("light"); root.classList.add("dark"); }
+    localStorage.setItem("s360_theme", theme);
+  }, [theme]);
 
   // Login
   const [loginUser, setLoginUser] = useState("");
@@ -168,7 +178,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-[#080d14] border-r border-border relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12 bg-card border-r border-border relative overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
@@ -176,7 +186,7 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
             backgroundSize: "40px 40px",
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#080d14]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-card" />
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-16">
@@ -212,7 +222,14 @@ export function Login({ onLogin }: { onLogin: (token: string) => void }) {
       </div>
 
       {/* Right panel — form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 relative">
+        <button
+          onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
+          title={theme === "dark" ? "Modo claro" : "Modo escuro"}
+          className="absolute top-5 right-5 w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-border"
+        >
+          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
         <div className="w-full max-w-sm">
 
           {/* Mobile logo */}
