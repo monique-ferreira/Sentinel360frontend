@@ -163,7 +163,10 @@ export function Reports() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                O arquivo será removido do <span className="text-foreground font-medium">Sentinel360</span> e excluído permanentemente do <span className="text-foreground font-medium">OneDrive</span>.
+                O arquivo será removido do <span className="text-foreground font-medium">Sentinel360</span> e excluído permanentemente do{" "}
+                <span className="text-foreground font-medium">
+                  {(confirmItem?.origem || "").toLowerCase().includes("google") ? "Google Drive" : "OneDrive"}
+                </span>.
               </p>
 
               {deleteError && (
